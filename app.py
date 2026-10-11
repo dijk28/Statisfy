@@ -12,11 +12,11 @@ st.set_page_config(
 )
 
 st.title("⚽ Professionele Betting Analyser & Trechter")
-st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem met automatische model-evaluatie.")
+st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem.")
 
-# ccd41811b56d4cf6bb944d2a5d5286f7
+# --- ZIJBALK VOOR API KEY (Vooringevuld) ---
 st.sidebar.header("⚙️ Instellingen")
-api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="")
+api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
 
 LEAGUES = {
     "Premier League": "PL",
@@ -44,8 +44,8 @@ else:
             return response.json()
         return None
 
-    if st.sidebar.button("🚀 Start Analyse & Evaluatie"):
-        with st.spinner("Bezig met het ophalen, berekenen en evalueren van alle wedstrijden... Dit kan even duren."):
+    if st.sidebar.button("🚀 Start Analyse"):
+        with st.spinner("Bezig met het ophalen en analyseren van alle competities... Dit kan even duren."):
             master_shortlist = []
             evaluation_results = []
             league_top_players = {}
@@ -81,7 +81,7 @@ else:
                 season_stats = {}
                 team_match_history = {}
 
-                # We bouwen de statistieken op per wedstrijd om ook historisch te kunnen evalueren
+                # Eerst alle gespeelde wedstrijden verwerken voor statistieken & evaluatie
                 for idx, m in enumerate(finished_sorted):
                     home = m["homeTeam"]["name"]
                     away = m["awayTeam"]["name"]
@@ -90,14 +90,12 @@ else:
                     hg, ag = ft["home"], ft["away"]
                     if hg is None or ag is None: continue
 
-                    # Huidige seizoensstats tot dit moment bijhouden voor evaluatie
-                    h_stat = season_stats.get(home, {"played": 0, "gf": 0, "ga": 0})
-                    a_stat = season_stats.get(away, {"played": 0, "gf": 0, "ga": 0})
-                    
+                    h_stat = season_stats.get(home)
+                    a_stat = season_stats.get(away)
                     min_games = 1 if league_code in ["CL", "EL"] else 3
-                    
-                    # Evalueer alleen als teams al genoeg wedstrijden hebben gespeeld op dat moment
-                    if h_stat["played"] >= min_games and a_stat["played"] >= min_games:
+
+                    # Als teams genoeg data hebben, kunnen we achteraf evalueren of het model gelijk had
+                    if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
 
@@ -110,7 +108,7 @@ else:
                             a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
                             a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
                             
-                            form_lam_h = max(0.5, (h_form_gf + h_form_ga) / 2)
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
                             form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
                         else:
                             form_lam_h, form_lam_a = season_lam_h, season_lam_a
@@ -126,7 +124,6 @@ else:
                         p_under_25 = 1 - p_over_25
                         p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
 
-                        # Check voorspellingen >= 60% en vergelijk met echte uitslag (`hg`, `ag`)
                         actual_total_goals = hg + ag
                         actual_home_win = 1 if hg > ag else 0
                         actual_btts = 1 if (hg > 0 and ag > 0) else 0
@@ -146,12 +143,12 @@ else:
                                     "Wedstrijd": f"{home} vs {away}",
                                     "Categorie": cat,
                                     "Model Kans": f"{int(prob*100)}%",
-                                    "Echte Uitslag": f"{hg}-{ag}",
+                                    "Echte Uitslag": f"{hg} - {ag}",
                                     "Status": "✅ GOED" if did_win else "❌ FOUT",
                                     "Win_Bool": did_win
                                 })
 
-                    # Update seizoensstats na deze wedstrijd
+                    # Seizoensstats & historie bijwerken voor volgende iteratie
                     for team, scored, conceded in [(home, hg, ag), (away, ag, hg)]:
                         if team not in season_stats:
                             season_stats[team] = {"played": 0, "gf": 0, "ga": 0}
@@ -164,7 +161,7 @@ else:
                     team_match_history[home].append({"scored": hg, "conceded": ag})
                     team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden voorspellen voor de Shortlist
+                # 3. Komende wedstrijden analyseren voor de Shortlist (Mainpage)
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -181,7 +178,7 @@ else:
                             continue
                             
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
-                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
                         a_history = team_match_history.get(a, [])[-5:]
@@ -192,7 +189,7 @@ else:
                             a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
                             a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
                             
-                            form_lam_h = max(0.5, (h_form_gf + h_form_ga) / 2)
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
                             form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
                         else:
                             form_lam_h, form_lam_a = season_lam_h, season_lam_a
@@ -224,10 +221,10 @@ else:
                         if p_under_25 >= 0.60:
                             master_shortlist.append({"Competitie": league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
 
-        st.success("Analyse en evaluatie succesvol voltooid!")
+        st.success("Analyse succesvol voltooid!")
         
-        # --- TABBLADEN IN DE APP ---
-        tab1, tab2, tab3 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Historie)", "⚽ Top Spelers"])
+        # --- TABBLADEN ---
+        tab1, tab2 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Goed/Fout)"])
         
         with tab1:
             st.header("🏆 Ultieme Shortlist (>= 60% Kans)")
@@ -239,33 +236,32 @@ else:
             else:
                 st.info("Geen wedstrijden gevonden die aan de strenge criteria van >= 60% kans voldoen.")
 
-        with tab2:
-            st.header("📊 Model Prestatie & Evaluatie")
-            st.markdown("Hier zie je hoe vaak het model in het verleden (reeds gespeelde wedstrijden) gelijk had bij een voorspelling van 60% of hoger.")
-            
-            if evaluation_results:
-                df_eval = pd.DataFrame(evaluation_results)
-                
-                # Bereken hitrate
-                total_preds = len(df_eval)
-                correct_preds = df_eval["Win_Bool"].sum()
-                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Totaal Geteste Voorspellingen", total_preds)
-                col2.metric("Aantal Goed", int(correct_preds))
-                col3.metric("Model Hitrate (Nauwkeurigheid)", f"{round(hitrate, 1)}%")
-                
-                st.markdown("---")
-                # Schoon de tabel op voor weergave
-                df_eval_display = df_eval.drop(columns=["Win_Bool"])
-                st.dataframe(df_eval_display, use_container_width=True)
-            else:
-                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
-
-        with tab3:
+            st.markdown("---")
             st.header("⚽ Top Spelers per Competitie")
             for comp_name, players in league_top_players.items():
                 with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
                     df_p = pd.DataFrame(players)
                     st.dataframe(df_p, use_container_width=True)
+
+        with tab2:
+            st.header("📊 Historische Evaluatie (Goed / Fout)")
+            st.markdown("Hier zie je per reeds gespeelde wedstrijd of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
+            
+            if evaluation_results:
+                df_eval = pd.DataFrame(evaluation_results)
+                
+                total_preds = len(df_eval)
+                correct_preds = df_eval["Win_Bool"].sum()
+                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Totaal Geteste Picks", total_preds)
+                col2.metric("Aantal Goed", int(correct_preds))
+                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
+                
+                st.markdown("---")
+                df_eval_display = df_eval.drop(columns=["Win_Bool"])
+                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
+                st.dataframe(df_eval_display, use_container_width=True)
+            else:
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
