@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚽ Professionele Betting Analyser")
+st.title("⚽ Professionele Betting Analyser & Trechter")
 st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem met bankroll management en grafieken.")
 
 # --- ZIJBALK VOOR INSTELLINGEN & BANKROLL ---
@@ -103,7 +103,7 @@ else:
 
                     if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
-                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(home, [])[-5:]
                         a_history = team_match_history.get(away, [])[-5:]
@@ -183,7 +183,7 @@ else:
                             continue
                             
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
-                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
                         a_history = team_match_history.get(a, [])[-5:]
@@ -260,4 +260,38 @@ else:
 
         with tab2:
             st.header("📊 Historische Evaluatie & Grafieken")
-            st.markdown("Hier zie je of de voorspellingen uit het verleden ($\ge 60\%$) goed of fout waren, inclus
+            st.markdown("Hier zie je of de voorspellingen uit het verleden (kansen van 60% of hoger) goed of fout waren, inclusief visuele grafieken.")
+            
+            if evaluation_results:
+                df_eval = pd.DataFrame(evaluation_results)
+                
+                total_preds = len(df_eval)
+                correct_preds = df_eval["Win_Bool"].sum()
+                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Totaal Geteste Picks", total_preds)
+                col2.metric("Aantal Goed", int(correct_preds))
+                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
+                
+                st.markdown("---")
+                
+                # Grafiek & samenvatting per categorie
+                st.subheader("📊 Prestatie per Categorie")
+                cat_summary = df_eval.groupby("Categorie")["Win_Bool"].agg(
+                    Totaal="count",
+                    Goed=lambda x: (x == 1).sum()
+                ).reset_index()
+                cat_summary["Hitrate (%)"] = round((cat_summary["Goed"] / cat_summary["Totaal"]) * 100, 1)
+                st.dataframe(cat_summary, use_container_width=True)
+                
+                # Streamlit bar chart
+                chart_data = cat_summary.set_index("Categorie")[["Goed", "Totaal"]]
+                st.bar_chart(chart_data)
+
+                st.markdown("---")
+                st.subheader("📝 Alle Geteste Wedstrijden")
+                df_eval_display = df_eval.drop(columns=["Win_Bool"]).sort_values(by="Datum", ascending=False)
+                st.dataframe(df_eval_display, use_container_width=True)
+            else:
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
