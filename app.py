@@ -11,12 +11,19 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚽ Professionele Betting Analyser & Trechter")
-st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem.")
+st.title("⚽ Professionele Betting Analyser")
+st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem met bankroll management en grafieken.")
 
-# --- ZIJBALK VOOR API KEY (Vooringevuld) ---
-st.sidebar.header("⚙️ Instellingen")
+# --- ZIJBALK VOOR INSTELLINGEN & BANKROLL ---
+st.sidebar.header("⚙️ Instellingen & Bankroll")
 api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("💰 Bankroll Management")
+total_bankroll = st.sidebar.number_input("Totale Bankroll (€)", min_value=10.0, value=500.0, step=50.0)
+unit_percentage = st.sidebar.slider("Inzet per Bet (% van Bankroll)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
+unit_size = total_bankroll * (unit_percentage / 100.0)
+st.sidebar.info(f"Standaard unit: **€{round(unit_size, 2)}** ({unit_percentage}%).")
 
 LEAGUES = {
     "Premier League": "PL",
@@ -94,7 +101,6 @@ else:
                     a_stat = season_stats.get(away)
                     min_games = 1 if league_code in ["CL", "EL"] else 3
 
-                    # Als teams genoeg data hebben, kunnen we achteraf evalueren of het model gelijk had
                     if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
@@ -111,7 +117,7 @@ else:
                             form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
                             form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
                         else:
-                            form_lam_h, form_lam_a = season_lam_h, season_lam_a
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
 
                         lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
                         lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
@@ -145,10 +151,9 @@ else:
                                     "Model Kans": f"{int(prob*100)}%",
                                     "Echte Uitslag": f"{hg} - {ag}",
                                     "Status": "✅ GOED" if did_win else "❌ FOUT",
-                                    "Win_Bool": did_win
+                                    "Win_Bool": 1 if did_win else 0
                                 })
 
-                    # Seizoensstats & historie bijwerken voor volgende iteratie
                     for team, scored, conceded in [(home, hg, ag), (away, ag, hg)]:
                         if team not in season_stats:
                             season_stats[team] = {"played": 0, "gf": 0, "ga": 0}
@@ -161,7 +166,7 @@ else:
                     team_match_history[home].append({"scored": hg, "conceded": ag})
                     team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden analyseren voor de Shortlist (Mainpage)
+                # 3. Komende wedstrijden analyseren voor de Shortlist
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -178,7 +183,7 @@ else:
                             continue
                             
                         season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
-                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
                         a_history = team_match_history.get(a, [])[-5:]
@@ -192,7 +197,7 @@ else:
                             form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
                             form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
                         else:
-                            form_lam_h, form_lam_a = season_lam_h, season_lam_a
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
 
                         lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
                         lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
@@ -213,25 +218,35 @@ else:
                             data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
 
                         if p_btts >= 0.60:
-                            master_shortlist.append({"Competitie": league_name, "Categorie": "⚽ BTTS (Beide Teams Scoren)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Kans op doelpunten beide kanten: {int(p_btts*100)}%", "Fair Odd": round(1 / p_btts, 2), "Data Basis": data_label, "Prob_Val": p_btts})
+                            master_shortlist.append({"Competitie": league_name, "Categorie": "⚽ BTTS (Beide Teams Scoren)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1 / p_btts, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_btts})
                         if p_over_25 >= 0.60:
-                            master_shortlist.append({"Competitie": league_name, "Categorie": "🔥 Doelpunten (Over 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)", "Fair Odd": round(1 / p_over_25, 2), "Data Basis": data_label, "Prob_Val": p_over_25})
+                            master_shortlist.append({"Competitie": league_name, "Categorie": "🔥 Doelpunten (Over 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)", "Fair Odd": round(1 / p_over_25, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_over_25})
                         if p_home_win >= 0.60:
-                            master_shortlist.append({"Competitie": league_name, "Categorie": "🏠 Sterke Thuiswinst", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Thuiswinst kans: {int(p_home_win*100)}%", "Fair Odd": round(1 / p_home_win, 2), "Data Basis": data_label, "Prob_Val": p_home_win})
+                            master_shortlist.append({"Competitie": league_name, "Categorie": "🏠 Sterke Thuiswinst", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Thuiswinst kans: {int(p_home_win*100)}%", "Fair Odd": round(1 / p_home_win, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_home_win})
                         if p_under_25 >= 0.60:
-                            master_shortlist.append({"Competitie": league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
+                            master_shortlist.append({"Competitie": league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
 
         st.success("Analyse succesvol voltooid!")
         
         # --- TABBLADEN ---
-        tab1, tab2 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Goed/Fout)"])
+        tab1, tab2 = st.tabs(["🎯 Shortlist & Bankroll", "📈 Track Record & Grafieken"])
         
         with tab1:
             st.header("🏆 Ultieme Shortlist (>= 60% Kans)")
             if master_shortlist:
                 df_shortlist = pd.DataFrame(master_shortlist)
-                df_shortlist = df_shortlist.sort_values(by="Prob_Val", ascending=False)
-                df_display = df_shortlist.drop(columns=["Prob_Val"])
+                
+                # Competitie-filter
+                unique_leagues = sorted(df_shortlist["Competitie"].unique().tolist())
+                selected_leagues = st.multiselect("🔍 Filter op Competitie(s):", options=unique_leagues, default=unique_leagues)
+                
+                if selected_leagues:
+                    df_filtered = df_shortlist[df_shortlist["Competitie"].isin(selected_leagues)]
+                else:
+                    df_filtered = df_shortlist
+                
+                df_filtered = df_filtered.sort_values(by="Prob_Val", ascending=False)
+                df_display = df_filtered.drop(columns=["Prob_Val"])
                 st.dataframe(df_display, use_container_width=True)
             else:
                 st.info("Geen wedstrijden gevonden die aan de strenge criteria van >= 60% kans voldoen.")
@@ -244,24 +259,5 @@ else:
                     st.dataframe(df_p, use_container_width=True)
 
         with tab2:
-            st.header("📊 Historische Evaluatie (Goed / Fout)")
-            st.markdown("Hier zie je per reeds gespeelde wedstrijd of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
-            
-            if evaluation_results:
-                df_eval = pd.DataFrame(evaluation_results)
-                
-                total_preds = len(df_eval)
-                correct_preds = df_eval["Win_Bool"].sum()
-                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Totaal Geteste Picks", total_preds)
-                col2.metric("Aantal Goed", int(correct_preds))
-                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
-                
-                st.markdown("---")
-                df_eval_display = df_eval.drop(columns=["Win_Bool"])
-                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
-                st.dataframe(df_eval_display, use_container_width=True)
-            else:
-                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
+            st.header("📊 Historische Evaluatie & Grafieken")
+            st.markdown("Hier zie je of de voorspellingen uit het verleden ($\ge 60\%$) goed of fout waren, inclus
