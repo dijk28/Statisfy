@@ -140,47 +140,4 @@ else:
                     team_match_history = {}
                     min_games = 1  # Versoepeld naar 1 wedstrijd
 
-                    # Gespeelde wedstrijden verwerken voor statistieken & evaluatie (Drempel: 55%)
-                    for m in finished_sorted:
-                        home = m["homeTeam"]["name"]
-                        away = m["awayTeam"]["name"]
-                        date = m["utcDate"][:10]
-                        ft = m["score"]["fullTime"]
-                        hg, ag = ft["home"], ft["away"]
-                        if hg is None or ag is None: continue
-
-                        h_stat = season_stats.get(home)
-                        a_stat = season_stats.get(away)
-
-                        if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
-                            season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
-                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
-
-                            h_history = team_match_history.get(home, [])[-5:]
-                            a_history = team_match_history.get(away, [])[-5:]
-                            
-                            if len(h_history) > 0 and len(a_history) > 0:
-                                h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
-                                h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
-                                a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
-                                a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
-                                
-                                form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
-                                form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
-                            else:
-                                form_lam_h, form_lam_a = season_lam_h, season_lam_h
-
-                            lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
-                            lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
-                            
-                            max_g = 6
-                            matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
-                            
-                            p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
-                            p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
-                            p_under_25 = 1 - p_over_25
-                            p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
-
-                            actual_total_goals = hg + ag
-                            actual_home_win = 1 if hg > ag else 0
-                            actual_btts = 1 if (hg > 0 and ag > 0)
+                    # Gespeelde wedstrijden verwerken voor statistieken & evaluatie (Drempel
