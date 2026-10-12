@@ -9,10 +9,10 @@ import time
 st.set_page_config(
     page_title="Personal Betting Assistant",
     page_icon="⚽",
-    layout="centered"
+    layout="centered" # Gecentreerd werkt fijner op zowel mobiel als desktop
 )
 
-# Custom CSS voor native app look
+# Custom CSS om de app een 'native app' look te geven op mobiel
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -71,7 +71,7 @@ else:
         return None
 
     if st.sidebar.button("🚀 Start Analyse"):
-        with st.spinner("Bezig met analyseren van alle competities (inclusief Europa)..."):
+        with st.spinner("Bezig met analyseren van alle competities..."):
             master_shortlist = []
             evaluation_results = []
             league_top_players = {}
@@ -98,13 +98,16 @@ else:
                 matches = match_data["matches"]
                 finished_matches = [m for m in matches if m["status"] == "FINISHED"]
                 scheduled = [m for m in matches if m["status"] in ["SCHEDULED", "TIMED"]]
+                
+                if not finished_matches:
+                    continue
 
                 finished_sorted = sorted(finished_matches, key=lambda x: x["utcDate"])
 
                 season_stats = {}
                 team_match_history = {}
 
-                # Gespeelde wedstrijden verwerken voor evaluatie & stats
+                # Gespeelde wedstrijden verwerken voor evaluatie
                 for idx, m in enumerate(finished_sorted):
                     home = m["homeTeam"]["name"]
                     away = m["awayTeam"]["name"]
@@ -195,33 +198,30 @@ else:
                         h_stat = season_stats.get(h)
                         a_stat = season_stats.get(a)
                         
-                        # Fallback lambda's voor Europese wedstrijden als er nog geen data is
-                        if h_stat and a_stat and h_stat["played"] >= (1 if league_code in ["CL", "EL"] else 3):
-                            season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
-                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+                        if not h_stat or not a_stat or h_stat["played"] < min_games or a_stat["played"] < min_games:
+                            continue
                             
-                            h_history = team_match_history.get(h, [])[-5:]
-                            a_history = team_match_history.get(a, [])[-5:]
-                            if len(h_history) > 0 and len(a_history) > 0:
-                                h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
-                                h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
-                                a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
-                                a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
-                                form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
-                                form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
-                            else:
-                                form_lam_h, form_lam_a = season_lam_h, season_lam_a
-                            
-                            lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
-                            lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
-                            data_label = f"Vorm/Seizoen data"
-                        else:
-                            # Standaard topclub / Europese fallback lambdas
-                            lam_h = 1.4
-                            lam_a = 1.1
-                            data_label = "⚠️ Europese Fallback Basis"
+                        season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
+                        h_history = team_match_history.get(h, [])[-5:]
+                        a_history = team_match_history.get(a, [])[-5:]
+                        
+                        if len(h_history) > 0 and len(a_history) > 0:
+                            h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
+                            h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
+                            a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
+                            a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
+                            
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
+                            form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
+                        else:
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
+
+                        lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
+                        lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
                         total_lam = lam_h + lam_a
+                        
                         max_g = 6
                         matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
                         
@@ -229,6 +229,12 @@ else:
                         p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
                         p_under_25 = 1 - p_over_25
                         p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+
+                        form_sample_h = len(h_history)
+                        if league_code in ["CL", "EL"]:
+                            data_label = f"⚠️ Beperkt (Europa: {form_sample_h}d)"
+                        else:
+                            data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
 
                         if p_btts >= 0.60:
                             master_shortlist.append({"Competitie": league_name, "Categorie": "⚽ BTTS (Beide Teams Scoren)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1 / p_btts, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_btts})
@@ -259,6 +265,7 @@ else:
                 
                 df_filtered = df_filtered.sort_values(by="Prob_Val", ascending=False)
                 
+                # Render als mobiele kaarten i.p.v. brede tabellen
                 for _, row in df_filtered.iterrows():
                     with st.container(border=True):
                         st.caption(f"🌍 {row['Competitie']} • 📅 {row['Datum']}")
