@@ -110,7 +110,7 @@ else:
                     p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
 
                     if p_btts >= 0.55:
-                        master_shortlist.append({"Categorie": "⚽ BTTS", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1/p_bitts, 2), "Prob": p_btts})
+                        master_shortlist.append({"Categorie": "⚽ BTTS", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1/p_btts, 2), "Prob": p_btts})
                     if p_over_25 >= 0.55:
                         master_shortlist.append({"Categorie": "🔥 Over 2.5", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_over_25*100)}%", "Fair Odd": round(1/p_over_25, 2), "Prob": p_over_25})
                     if p_home_win >= 0.55:
@@ -118,7 +118,6 @@ else:
 
             # 2. Afgelopen wedstrijden (Hit / Miss Analyse & Grafiek)
             if finished_data and "matches" in finished_data:
-                # Neem de meest recente afgesloten wedstrijden
                 recent_finished = finished_data["matches"][-10:]
                 for match in recent_finished:
                     h = match["homeTeam"]["name"]
@@ -141,4 +140,39 @@ else:
             st.success("Analyse voltooid!")
 
             # --- RENDER SHORTLIST (MOBIELE KAARTEN) ---
-            st.header(f"🏆 Short
+            st.header(f"🏆 Shortlist: {selected_league_name}")
+            if master_shortlist:
+                df_short = pd.DataFrame(master_shortlist).sort_values(by="Prob", ascending=False)
+                for _, row in df_short.iterrows():
+                    with st.container(border=True):
+                        st.caption(f"📅 {row['Datum']}")
+                        st.markdown(f"### {row['Wedstrijd']}")
+                        st.markdown(f"**{row['Categorie']}**")
+                        c1, c2 = st.columns(2)
+                        c1.metric("Kans", row['Model'].split(":")[-1].strip())
+                        c2.metric("Fair Odd", f"{row['Fair Odd']}")
+            else:
+                st.info("Geen aankomende wedstrijden gevonden die voldoen aan de drempel.")
+
+            st.markdown("---")
+
+            # --- RECENTE RESULTATEN & HIT/MISS GRAFIEK ---
+            st.header("📊 Recente Resultaten (Hit / Miss)")
+            st.caption("Overzicht van de meest recente afgesloten wedstrijden en of de markten zijn gevallen.")
+            
+            if history_results:
+                df_history = pd.DataFrame(history_results)
+                st.dataframe(df_history, use_container_width=True)
+
+                hits_count = sum(1 for r in history_results if "Hit" in r["Over 2.5 Resultaat"])
+                misses_count = len(history_results) - hits_count
+
+                chart_data = pd.DataFrame({
+                    "Status": ["Hit ✅", "Miss ❌"],
+                    "Aantal": [hits_count, misses_count]
+                })
+
+                st.subheader("📈 Prestatie Over 2.5 (Recente duels)")
+                st.bar_chart(chart_data.set_index("Status"))
+            else:
+                st.info("Geen voldoende historische data beschikbaar voor deze competitie.")
