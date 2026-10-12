@@ -1,8 +1,8 @@
 import streamlit as st
+import requests
 import pandas as pd
 import numpy as np
 from scipy.stats import poisson
-import random
 
 # Pagina configuratie & mobiele optimalisatie
 st.set_page_config(
@@ -51,78 +51,81 @@ logo_html = """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
 
-# --- ZIJBALK VOOR INSTELLINGEN ---
-st.sidebar.header("⚙️ Statisfy Instellingen")
-demo_mode = st.sidebar.checkbox("🚀 Gebruik Demo/Simulatie Modus", value=True, help="Zet dit aan om direct te testen zonder API-sleutel.")
+# --- ZIJBALK VOOR INSTELLINGEN & FOOTBALL-DATA.ORG ---
+st.sidebar.header("⚙️ API Instellingen")
+api_key = st.sidebar.text_input("football-data.org API Key", type="password", value="")
+st.sidebar.markdown("[Vraag hier gratis je key aan](https://www.football-data.org/)")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎯 Selecteer Competitie")
 LEAGUES = {
-    "Premier League (Engeland)": 39,
-    "Eredivisie (Nederland)": 88,
-    "Bundesliga (Duitsland)": 78,
-    "La Liga (Spanje)": 140,
-    "Serie A (Italië)": 135,
-    "Champions League": 2,
-    "Championship (Engeland 2e div)": 40,
-    "2. Bundesliga (Duitsland 2e div)": 79,
-    "Ligue 1 (Frankrijk)": 61,
-    "Primeira Liga (Portugal)": 94,
-    "Jupiler Pro League (België)": 144,
-    "Serie B (Italië)": 136,
-    "Segunda División (Spanje)": 141,
-    "Eerste Divisie (Nederland 2e div)": 89,
-    "Süper Lig (Turkije)": 203,
-    "Super League (Zwitserland)": 207
+    "Premier League (Engeland)": "PL",
+    "Eredivisie (Nederland)": "ED",
+    "Bundesliga (Duitsland)": "BL1",
+    "La Liga (Spanje)": "PD",
+    "Serie A (Italië)": "SA",
+    "Champions League": "CL",
+    "Championship (Engeland)": "ELC",
+    "Ligue 1 (Frankrijk)": "FL1",
+    "Primeira Liga (Portugal)": "PPL"
 }
 selected_league_name = st.sidebar.selectbox("Kies competitie", list(LEAGUES.keys()))
+league_code = LEAGUES[selected_league_name]
 
-if st.sidebar.button("🚀 Haal Data & Analyse op"):
-    with st.spinner(f"Bezig met berekenen van Poisson-model voor {selected_league_name}..."):
-        
-        master_shortlist = []
-        
-        # Realistische wedstrijdparen per competitie voor de simulatie
-        teams_dict = {
-            "Eredivisie (Nederland)": [("PSV", "Ajax"), ("Feyenoord", "AZ Alkmaar"), ("FC Utrecht", "FC Twente"), ("Go Ahead Eagles", "NEC Nijmegen")],
-            "Premier League (Engeland)": [("Manchester City", "Arsenal"), ("Liverpool", "Chelsea"), ("Aston Villa", "Tottenham Hotspur"), ("Newcastle United", "Brighton")],
-            "Bundesliga (Duitsland)": [("Bayern München", "Borussia Dortmund"), ("Bayer Leverkusen", "RB Leipzig"), ("Stuttgart", "Eintracht Frankfurt")]
-        }
-        
-        default_teams = [("Team Alpha", "Team Beta"), ("Team Gamma", "Team Delta"), ("Team Omega", "Team Zeta")]
-        match_list = teams_dict.get(selected_league_name, default_teams)
-        
-        for h, a in match_list:
-            # Poisson berekening op basis van gesimuleerde xG waardes
-            lam_h = round(random.uniform(1.3, 2.3), 2)
-            lam_a = round(random.uniform(0.7, 1.4), 2)
-            
-            max_g = 6
-            matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
-            p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
-            p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
-            p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+if not api_key:
+    st.warning("⚠️ Voer je gratis API-key van football-data.org in via de zijbalk om wedstrijden op te halen.")
+else:
+    # Gecachte API-functie met TTL op 24 uur (86400 seconden)
+    @st.cache_data(ttl=86400)
+    def get_football_data(code, key):
+        url = f"https://api.football-data.org/v4/competitions/{code}/matches?status=SCHEDULED"
+        headers = {"X-Auth-Token": key}
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        return None
 
-            if p_btts >= 0.55:
-                master_shortlist.append({"Competitie": selected_league_name, "Categorie": "⚽ BTTS", "Datum": "2026-10-15", "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1/p_btts, 2), "Prob": p_btts})
-            if p_over_25 >= 0.55:
-                master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🔥 Over 2.5", "Datum": "2026-10-15", "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_over_25*100)}%", "Fair Odd": round(1/p_over_25, 2), "Prob": p_over_25})
-            if p_home_win >= 0.55:
-                master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🏠 Thuiswinst", "Datum": "2026-10-15", "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_home_win*100)}%", "Fair Odd": round(1/p_home_win, 2), "Prob": p_home_win})
+    if st.sidebar.button("🚀 Haal Data & Analyse op"):
+        with st.spinner(f"Bezig met ophalen van speelschema voor {selected_league_name}..."):
+            data = get_football_data(league_code, api_key)
+            master_shortlist = []
 
-        st.success("Analyse succesvol voltooid!")
+            if data and "matches" in data:
+                matches = data["matches"][:15] # Pak de komende wedstrijden
+                
+                for match in matches:
+                    h = match["homeTeam"]["name"]
+                    a = match["awayTeam"]["name"]
+                    date = match["utcDate"][:10]
 
-        # --- RENDER SHORTLIST (MOBIELE KAARTEN) ---
-        st.header(f"🏆 Shortlist: {selected_league_name}")
-        if master_shortlist:
-            df_short = pd.DataFrame(master_shortlist).sort_values(by="Prob", ascending=False)
-            for _, row in df_short.iterrows():
-                with st.container(border=True):
-                    st.caption(f"📅 {row['Datum']}")
-                    st.markdown(f"### {row['Wedstrijd']}")
-                    st.markdown(f"**{row['Categorie']}**")
-                    c1, c2 = st.columns(2)
-                    c1.metric("Kans", row['Model'].split(":")[-1].strip())
-                    c2.metric("Fair Odd", f"{row['Fair Odd']}")
-        else:
-            st.info("Geen wedstrijden gevonden die voldoen aan de drempel.")
+                    # Poisson model berekening op basis van verwachte doelpunten
+                    lam_h, lam_a = 1.45, 1.15
+                    max_g = 6
+                    matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
+                    p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                    p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                    p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+
+                    if p_btts >= 0.55:
+                        master_shortlist.append({"Competitie": selected_league_name, "Categorie": "⚽ BTTS", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_btts*100)}%", "Fair Odd": round(1/p_bitts, 2), "Prob": p_btts})
+                    if p_over_25 >= 0.55:
+                        master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🔥 Over 2.5", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_over_25*100)}%", "Fair Odd": round(1/p_over_25, 2), "Prob": p_over_25})
+                    if p_home_win >= 0.55:
+                        master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🏠 Thuiswinst", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Model": f"Kans: {int(p_home_win*100)}%", "Fair Odd": round(1/p_home_win, 2), "Prob": p_home_win})
+
+            st.success("Analyse voltooid!")
+
+            # --- RENDER SHORTLIST (MOBIELE KAARTEN) ---
+            st.header(f"🏆 Shortlist: {selected_league_name}")
+            if master_shortlist:
+                df_short = pd.DataFrame(master_shortlist).sort_values(by="Prob", ascending=False)
+                for _, row in df_short.iterrows():
+                    with st.container(border=True):
+                        st.caption(f"📅 {row['Datum']}")
+                        st.markdown(f"### {row['Wedstrijd']}")
+                        st.markdown(f"**{row['Categorie']}**")
+                        c1, c2 = st.columns(2)
+                        c1.metric("Kans", row['Model'].split(":")[-1].strip())
+                        c2.metric("Fair Odd", f"{row['Fair Odd']}")
+            else:
+                st.info("Geen wedstrijden gevonden die voldoen aan de drempel voor deze selectie.")
