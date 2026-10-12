@@ -5,37 +5,22 @@ import numpy as np
 from scipy.stats import poisson
 import time
 
-# Pagina configuratie & mobiele optimalisatie
+# Pagina configuratie
 st.set_page_config(
     page_title="Personal Betting Assistant",
     page_icon="⚽",
-    layout="centered" # Gecentreerd werkt fijner op zowel mobiel als desktop
+    layout="wide"
 )
 
-# Custom CSS om de app een 'native app' look te geven op mobiel
-st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 2rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-st.title("⚽ Betting Assistent")
-st.markdown("Datagedreven model & bankroll management.")
+st.title("⚽ Professionele Betting Analyser & Trechter")
+st.markdown("Welkom bij je persoonlijke beslissingsondersteunende systeem met bankroll management en grafieken.")
 
 # --- ZIJBALK VOOR INSTELLINGEN & BANKROLL ---
-st.sidebar.header("⚙️ Instellingen")
-api_key_input = st.sidebar.text_input("API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
+st.sidebar.header("⚙️ Instellingen & Bankroll")
+api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("💰 Bankroll")
+st.sidebar.subheader("💰 Bankroll Management")
 total_bankroll = st.sidebar.number_input("Totale Bankroll (€)", min_value=10.0, value=500.0, step=50.0)
 unit_percentage = st.sidebar.slider("Inzet per Bet (% van Bankroll)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
 unit_size = total_bankroll * (unit_percentage / 100.0)
@@ -55,7 +40,7 @@ LEAGUES = {
 }
 
 if not api_key_input:
-    st.warning("⚠️ Voer je API-key in via de zijbalk.")
+    st.warning("⚠️ Voer je API-key in via de zijbalk aan de linkerkant om de analyse te starten.")
 else:
     headers = {"X-Auth-Token": api_key_input}
     BASE_URL = "https://api.football-data.org/v4/"
@@ -63,15 +48,16 @@ else:
     def get_api_data(endpoint):
         url = f"{BASE_URL}{endpoint}"
         response = requests.get(url, headers=headers)
+        # Korte pauze om te zorgen dat we binnen de API-limieten blijven
         time.sleep(0.7)
         if response.status_code == 200:
             return response.json()
         elif response.status_code == 429:
-            st.warning("⚠️ Te veel API-verzoeken. Wacht heel even en probeer opnieuw.")
+            st.warning("⚠️ Te veel verzoeken naar de API tegelijk. Wacht heel even een minuutje en probeer opnieuw.")
         return None
 
     if st.sidebar.button("🚀 Start Analyse"):
-        with st.spinner("Bezig met analyseren van alle competities..."):
+        with st.spinner("Bezig met het ophalen en analyseren van alle competities (dit duurt ca. 10 seconden)..."):
             master_shortlist = []
             evaluation_results = []
             league_top_players = {}
@@ -107,7 +93,7 @@ else:
                 season_stats = {}
                 team_match_history = {}
 
-                # Gespeelde wedstrijden verwerken voor evaluatie
+                # Eerst alle gespeelde wedstrijden verwerken voor statistieken & evaluatie
                 for idx, m in enumerate(finished_sorted):
                     home = m["homeTeam"]["name"]
                     away = m["awayTeam"]["name"]
@@ -121,7 +107,7 @@ else:
                     min_games = 1 if league_code in ["CL", "EL"] else 3
 
                     if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
-                        season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (a_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(home, [])[-5:]
@@ -245,18 +231,18 @@ else:
                         if p_under_25 >= 0.60:
                             master_shortlist.append({"Competitie": league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Inzet (€)": round(unit_size, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
 
-        st.success("Analyse voltooid!")
+        st.success("Analyse succesvol voltooid!")
         
         # --- TABBLADEN ---
-        tab1, tab2 = st.tabs(["🎯 Shortlist", "📈 Evaluatie"])
+        tab1, tab2 = st.tabs(["🎯 Shortlist & Bankroll", "📈 Track Record & Grafieken"])
         
         with tab1:
-            st.header("🏆 Shortlist (>= 60%)")
+            st.header("🏆 Ultieme Shortlist (>= 60% Kans)")
             if master_shortlist:
                 df_shortlist = pd.DataFrame(master_shortlist)
                 
                 unique_leagues = sorted(df_shortlist["Competitie"].unique().tolist())
-                selected_leagues = st.multiselect("Filter Competities:", options=unique_leagues, default=unique_leagues)
+                selected_leagues = st.multiselect("🔍 Filter op Competitie(s):", options=unique_leagues, default=unique_leagues)
                 
                 if selected_leagues:
                     df_filtered = df_shortlist[df_shortlist["Competitie"].isin(selected_leagues)]
@@ -264,32 +250,22 @@ else:
                     df_filtered = df_shortlist
                 
                 df_filtered = df_filtered.sort_values(by="Prob_Val", ascending=False)
-                
-                # Render als mobiele kaarten i.p.v. brede tabellen
-                for _, row in df_filtered.iterrows():
-                    with st.container(border=True):
-                        st.caption(f"🌍 {row['Competitie']} • 📅 {row['Datum']}")
-                        st.markdown(f"### {row['Wedstrijd']}")
-                        st.markdown(f"**{row['Categorie']}**")
-                        
-                        col_m1, col_m2, col_m3 = st.columns(3)
-                        col_m1.metric("Kans", row['Indicatie / Model'].split(":")[-1].strip() if ":" in row['Indicatie / Model'] else row['Indicatie / Model'])
-                        col_m2.metric("Fair Odd", f"{row['Fair Odd']}")
-                        col_m3.metric("Inzet", f"€{row['Inzet (€)']}")
-                        
-                        st.caption(f"ℹ️ {row['Data Basis']}")
+                df_display = df_filtered.drop(columns=["Prob_Val"])
+                st.dataframe(df_display, use_container_width=True)
             else:
-                st.info("Geen wedstrijden gevonden met >= 60% kans.")
+                st.info("Geen wedstrijden gevonden die aan de strenge criteria van >= 60% kans voldoen.")
 
             st.markdown("---")
-            st.header("⚽ Top Spelers")
+            st.header("⚽ Top Spelers per Competitie")
             for comp_name, players in league_top_players.items():
-                with st.expander(f"Topscorers {comp_name}"):
+                with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
                     df_p = pd.DataFrame(players)
                     st.dataframe(df_p, use_container_width=True)
 
         with tab2:
-            st.header("📊 Hitrate & Evaluatie")
+            st.header("📊 Historische Evaluatie & Grafieken")
+            st.markdown("Hier zie je of de voorspellingen uit het verleden (kansen van 60% of hoger) goed of fout waren, inclusief visuele grafieken.")
+            
             if evaluation_results:
                 df_eval = pd.DataFrame(evaluation_results)
                 
@@ -298,12 +274,13 @@ else:
                 hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
                 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Picks", total_preds)
-                col2.metric("Goed", int(correct_preds))
-                col3.metric("Hitrate", f"{round(hitrate, 1)}%")
+                col1.metric("Totaal Geteste Picks", total_preds)
+                col2.metric("Aantal Goed", int(correct_preds))
+                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
                 
                 st.markdown("---")
-                st.subheader("Per Categorie")
+                
+                st.subheader("📊 Prestatie per Categorie")
                 cat_summary = df_eval.groupby("Categorie")["Win_Bool"].agg(
                     Totaal="count",
                     Goed=lambda x: (x == 1).sum()
@@ -311,11 +288,12 @@ else:
                 cat_summary["Hitrate (%)"] = round((cat_summary["Goed"] / cat_summary["Totaal"]) * 100, 1)
                 st.dataframe(cat_summary, use_container_width=True)
                 
-                st.bar_chart(cat_summary.set_index("Categorie")[["Goed", "Totaal"]])
+                chart_data = cat_summary.set_index("Categorie")[["Goed", "Totaal"]]
+                st.bar_chart(chart_data)
 
                 st.markdown("---")
-                st.subheader("Historie")
+                st.subheader("📝 Alle Geteste Wedstrijden")
                 df_eval_display = df_eval.drop(columns=["Win_Bool"]).sort_values(by="Datum", ascending=False)
                 st.dataframe(df_eval_display, use_container_width=True)
             else:
-                st.info("Nog geen historische evaluatiedata.")
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
