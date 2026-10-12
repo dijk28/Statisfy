@@ -1,8 +1,3 @@
-Geheel opgeschoond! De bankroll-functionaliteit en de inzet-berekeningen zijn volledig uit de app gehaald, zodat het model puur focust op de statistische kansen en fair odds.
-
-Kopieer onderstaande code en vervang hiermee de volledige inhoud van je `app.py`:
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
