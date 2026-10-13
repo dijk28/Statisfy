@@ -27,25 +27,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SUBTIEL LOGO BOVENAAN ---
+# --- SUBTIEL EN COMPACT LOGO BOVENAAN ---
 logo_html = """
-<div style="display: flex; align-items: center; justify-content: center; padding: 5px 0;">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 100" width="280px">
+<div style="display: flex; align-items: center; justify-content: center; padding: 5px 0 15px 0;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 75" width="280px" height="auto">
     <defs>
       <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
         <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
       </linearGradient>
     </defs>
-    <g transform="translate(10, 5)">
-      <circle cx="40" cy="40" r="35" fill="none" stroke="url(#grad)" stroke-width="4" opacity="0.3"/>
-      <rect x="25" y="45" width="8" height="15" rx="2" fill="#2ECC71"/>
-      <rect x="37" y="30" width="8" height="30" rx="2" fill="#3498DB"/>
-      <rect x="49" y="18" width="8" height="42" rx="2" fill="#2ECC71"/>
-      <polyline points="29,40 41,25 53,13" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(0, -2) scale(0.65)">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.3"/>
+      <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
+      <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
+      <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
+      <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
     </g>
-    <text x="110" y="52" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
-    <text x="112" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#8892B0" letter-spacing="2">DATA-DRIVEN BETTING</text>
+    <text x="75" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
+    <text x="77" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600" fill="#8892B0" letter-spacing="2">DATA-DRIVEN BETTING</text>
   </svg>
 </div>
 """
@@ -236,7 +237,7 @@ else:
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
-                        a_history = team_match_history.get(away, [])[-5:]
+                        a_history = team_match_history.get(a, [])[-5:]
                         
                         if len(h_history) > 0 and len(a_history) > 0:
                             h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
