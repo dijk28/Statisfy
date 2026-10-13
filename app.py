@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS voor native app look
+# Custom CSS voor native app look & mobiele optimalisatie
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -24,33 +24,41 @@ st.markdown("""
             padding-left: 1rem;
             padding-right: 1rem;
         }
+        /* Extra mobiele optimalisaties */
+        @media (max-width: 768px) {
+            .block-container {
+                padding-top: 0.5rem;
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            h1 { font-size: 1.5rem !important; }
+            h2 { font-size: 1.3rem !important; }
+            h3 { font-size: 1.1rem !important; }
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SUBTIEL EN KOGELVRIJ LOGO BOVENAAN ---
+# --- STATISFY LOGO ---
 logo_html = """
-<div style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 20px 0;">
-  <!-- SVG Icoon -->
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="38" height="38">
-    <defs>
-      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
-      </linearGradient>
-    </defs>
-    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="500" height="150" rx="20" fill="#0E1117"/>
+  <g transform="translate(30, 25)">
+    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.25"/>
     <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
     <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
     <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
     <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
-  </svg>
-  <!-- Tekst via HTML/CSS (altijd 100% stabiel) -->
-  <div style="display: flex; flex-direction: column;">
-    <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 28px; font-weight: 800; color: #FFFFFF; line-height: 1.1;">Stat<span style="color: #2ECC71;">isfy</span></span>
-    <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; color: #8892B0; letter-spacing: 2px;">DATA-DRIVEN BETTING</span>
-  </div>
-</div>
+  </g>
+  <text x="145" y="92" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
+  <text x="148" y="118" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#8892B0" letter-spacing="2.5">DATA-DRIVEN BETTING</text>
+</svg>
 """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
@@ -239,7 +247,7 @@ else:
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
-                        a_history = team_match_history.get(away, [])[-5:]
+                        a_history = team_match_history.get(a, [])[-5:]
                         
                         if len(h_history) > 0 and len(a_history) > 0:
                             h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
@@ -254,7 +262,7 @@ else:
 
                         lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
                         lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
-                        total_lam = lam_h + lam_a
+                        total_lam = lam_h + lam_a  # Volledig uitgeschreven
                         
                         max_g = 6
                         matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
@@ -273,56 +281,4 @@ else:
                         if p_btts >= 0.60:
                             master_shortlist.append({"Competitie": selected_league_name, "Categorie": "⚽ BTTS (Beide Teams Scoren)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Kans op doelpunten beide kanten: {int(p_btts*100)}%", "Fair Odd": round(1 / p_btts, 2), "Data Basis": data_label, "Prob_Val": p_btts})
                         if p_over_25 >= 0.60:
-                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🔥 Doelpunten (Over 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)", "Fair Odd": round(1 / p_over_25, 2), "Data Basis": data_label, "Prob_Val": p_over_25})
-                        if p_home_win >= 0.60:
-                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🏠 Sterke Thuiswinst", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Thuiswinst kans: {int(p_home_win*100)}%", "Fair Odd": round(1 / p_home_win, 2), "Data Basis": data_label, "Prob_Val": p_home_win})
-                        if p_under_25 >= 0.60:
-                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
-
-        st.success("Analyse succesvol voltooid!")
-        
-        # --- TABBLADEN ---
-        tab1, tab2 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Goed/Fout)"])
-        
-        with tab1:
-            st.header(f"🏆 Shortlist: {selected_league_name} (>= 60% Kans)")
-            if master_shortlist:
-                df_shortlist = pd.DataFrame(master_shortlist)
-                df_shortlist = df_shortlist.sort_values(by="Prob_Val", ascending=False)
-                df_display = df_shortlist.drop(columns=["Prob_Val"])
-                st.dataframe(df_display, use_container_width=True)
-            else:
-                st.info(f"Geen wedstrijden gevonden voor {selected_league_name} die aan de strenge criteria van >= 60% kans voldoen.")
-
-            st.markdown("---")
-            st.header(f"⚽ Top Spelers: {selected_league_name}")
-            if league_top_players:
-                for comp_name, players in league_top_players.items():
-                    with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
-                        df_p = pd.DataFrame(players)
-                        st.dataframe(df_p, use_container_width=True)
-            else:
-                st.info("Geen topscorersdata beschikbaar.")
-
-        with tab2:
-            st.header(f"📊 Historische Evaluatie: {selected_league_name}")
-            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
-            
-            if evaluation_results:
-                df_eval = pd.DataFrame(evaluation_results)
-                
-                total_preds = len(df_eval)
-                correct_preds = df_eval["Win_Bool"].sum()
-                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Totaal Geteste Picks", total_preds)
-                col2.metric("Aantal Goed", int(correct_preds))
-                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
-                
-                st.markdown("---")
-                df_eval_display = df_eval.drop(columns=["Win_Bool"])
-                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
-                st.dataframe(df_eval_display, use_container_width=True)
-            else:
-                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
+                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🔥 Doelpunten (Over 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verw
