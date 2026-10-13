@@ -27,27 +27,31 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- STATISFY LOGO ---
+# --- STATISFY LOGO IN ZIJBALK ---
 logo_html = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150" width="100%" height="100%">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="500" height="150" rx="20" fill="#0E1117"/>
-  <g transform="translate(30, 25)">
-    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.25"/>
-    <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
-    <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
-    <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
-    <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
-  </g>
-  <text x="145" y="92" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
-  <text x="148" y="118" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#8892B0" letter-spacing="2.5">DATA-DRIVEN BETTING</text>
-</svg>
+<div style="text-align: center; padding: 10px 0;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 130" width="85%">
+    <defs>
+      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <g transform="translate(30, 15)">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.25"/>
+      <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
+      <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
+      <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
+      <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
+    </g>
+    <text x="145" y="82" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
+    <text x="148" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#8892B0" letter-spacing="2.5">DATA-DRIVEN BETTING</text>
+  </svg>
+</div>
+"""
+st.sidebar.markdown(logo_html, unsafe_allow_html=True)
+st.sidebar.markdown("---")
 """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
