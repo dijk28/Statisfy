@@ -251,4 +251,75 @@ else:
 
                         lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
                         lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
-                        total_lam = lam_
+                        total_lam = lam_h + lam_a  # Volledig uitgeschreven
+                        
+                        max_g = 6
+                        matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
+                        
+                        p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                        p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                        p_under_25 = 1 - p_over_25
+                        p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+
+                        form_sample_h = len(h_history)
+                        if league_code in ["CL", "EL"]:
+                            data_label = f"⚠️ Beperkt (Europa: {form_sample_h}d)"
+                        else:
+                            data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
+
+                        if p_btts >= 0.60:
+                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "⚽ BTTS (Beide Teams Scoren)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Kans op doelpunten beide kanten: {int(p_btts*100)}%", "Fair Odd": round(1 / p_btts, 2), "Data Basis": data_label, "Prob_Val": p_btts})
+                        if p_over_25 >= 0.60:
+                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🔥 Doelpunten (Over 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)", "Fair Odd": round(1 / p_over_25, 2), "Data Basis": data_label, "Prob_Val": p_over_25})
+                        if p_home_win >= 0.60:
+                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🏠 Sterke Thuiswinst", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Thuiswinst kans: {int(p_home_win*100)}%", "Fair Odd": round(1 / p_home_win, 2), "Data Basis": data_label, "Prob_Val": p_home_win})
+                        if p_under_25 >= 0.60:
+                            master_shortlist.append({"Competitie": selected_league_name, "Categorie": "🛡️ Weinig Goals (Under 2.5)", "Datum": date, "Wedstrijd": f"{h} vs {a}", "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)", "Fair Odd": round(1 / p_under_25, 2), "Data Basis": data_label, "Prob_Val": p_under_25})
+
+        st.success("Analyse succesvol voltooid!")
+        
+        # --- TABBLADEN ---
+        tab1, tab2 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Goed/Fout)"])
+        
+        with tab1:
+            st.header(f"🏆 Shortlist: {selected_league_name} (>= 60% Kans)")
+            if master_shortlist:
+                df_shortlist = pd.DataFrame(master_shortlist)
+                df_shortlist = df_shortlist.sort_values(by="Prob_Val", ascending=False)
+                df_display = df_shortlist.drop(columns=["Prob_Val"])
+                st.dataframe(df_display, use_container_width=True)
+            else:
+                st.info(f"Geen wedstrijden gevonden voor {selected_league_name} die aan de strenge criteria van >= 60% kans voldoen.")
+
+            st.markdown("---")
+            st.header(f"⚽ Top Spelers: {selected_league_name}")
+            if league_top_players:
+                for comp_name, players in league_top_players.items():
+                    with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
+                        df_p = pd.DataFrame(players)
+                        st.dataframe(df_p, use_container_width=True)
+            else:
+                st.info("Geen topscorersdata beschikbaar.")
+
+        with tab2:
+            st.header(f"📊 Historische Evaluatie: {selected_league_name}")
+            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
+            
+            if evaluation_results:
+                df_eval = pd.DataFrame(evaluation_results)
+                
+                total_preds = len(df_eval)
+                correct_preds = df_eval["Win_Bool"].sum()
+                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Totaal Geteste Picks", total_preds)
+                col2.metric("Aantal Goed", int(correct_preds))
+                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
+                
+                st.markdown("---")
+                df_eval_display = df_eval.drop(columns=["Win_Bool"])
+                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
+                st.dataframe(df_eval_display, use_container_width=True)
+            else:
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
