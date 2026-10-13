@@ -27,31 +27,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- STATISFY LOGO IN ZIJBALK ---
+# --- SUBTIEL LOGO BOVENAAN ---
 logo_html = """
-<div style="text-align: center; padding: 10px 0;">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 130" width="85%">
+<div style="display: flex; align-items: center; justify-content: center; padding: 5px 0;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 100" width="280px">
     <defs>
       <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
         <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
       </linearGradient>
     </defs>
-    <g transform="translate(30, 15)">
-      <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.25"/>
-      <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
-      <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
-      <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
-      <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
+    <g transform="translate(10, 5)">
+      <circle cx="40" cy="40" r="35" fill="none" stroke="url(#grad)" stroke-width="4" opacity="0.3"/>
+      <rect x="25" y="45" width="8" height="15" rx="2" fill="#2ECC71"/>
+      <rect x="37" y="30" width="8" height="30" rx="2" fill="#3498DB"/>
+      <rect x="49" y="18" width="8" height="42" rx="2" fill="#2ECC71"/>
+      <polyline points="29,40 41,25 53,13" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
-    <text x="145" y="82" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
-    <text x="148" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#8892B0" letter-spacing="2.5">DATA-DRIVEN BETTING</text>
+    <text x="110" y="52" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
+    <text x="112" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#8892B0" letter-spacing="2">DATA-DRIVEN BETTING</text>
   </svg>
 </div>
-"""
-st.sidebar.markdown(logo_html, unsafe_allow_html=True)
-st.sidebar.markdown("---")
 """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
@@ -240,7 +236,7 @@ else:
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
-                        a_history = team_match_history.get(a, [])[-5:]
+                        a_history = team_match_history.get(away, [])[-5:]
                         
                         if len(h_history) > 0 and len(a_history) > 0:
                             h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
@@ -255,7 +251,7 @@ else:
 
                         lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
                         lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
-                        total_lam = lam_h + lam_a  # Volledig uitgeschreven
+                        total_lam = lam_h + lam_a
                         
                         max_g = 6
                         matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
