@@ -27,29 +27,29 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SUBTIEL EN COMPACT LOGO BOVENAAN ---
+# --- SUBTIEL EN KOGELVRIJ LOGO BOVENAAN ---
 logo_html = """
-<div style="display: flex; align-items: center; justify-content: center; padding: 5px 0 15px 0;">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450 100" width="320px" height="70px">
+<div style="display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 20px 0;">
+  <!-- SVG Icoon -->
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="38" height="38">
     <defs>
       <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
         <stop offset="100%" style="stop-color:#3498DB;stop-opacity:1" />
       </linearGradient>
     </defs>
-    <!-- Icon -->
-    <g transform="translate(10, 10)">
-      <circle cx="40" cy="40" r="35" fill="none" stroke="url(#grad)" stroke-width="4" opacity="0.3"/>
-      <rect x="23" y="45" width="8" height="20" rx="2" fill="#2ECC71"/>
-      <rect x="36" y="30" width="8" height="35" rx="2" fill="#3498DB"/>
-      <rect x="49" y="15" width="8" height="50" rx="2" fill="#2ECC71"/>
-      <polyline points="27,45 40,28 53,13" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="53" cy="13" r="3.5" fill="#FFFFFF"/>
-    </g>
-    <!-- Text -->
-    <text x="105" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="800" fill="#FFFFFF">Stat<tspan fill="#2ECC71">isfy</tspan></text>
-    <text x="107" y="78" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#8892B0" letter-spacing="2.5">DATA-DRIVEN BETTING</text>
+    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad)" stroke-width="5" opacity="0.3"/>
+    <rect x="30" y="55" width="10" height="20" rx="3" fill="#2ECC71"/>
+    <rect x="45" y="35" width="10" height="40" rx="3" fill="#3498DB"/>
+    <rect x="60" y="20" width="10" height="55" rx="3" fill="#2ECC71"/>
+    <polyline points="35,50 50,30 65,15" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="65" cy="15" r="4" fill="#FFFFFF"/>
   </svg>
+  <!-- Tekst via HTML/CSS (altijd 100% stabiel) -->
+  <div style="display: flex; flex-direction: column;">
+    <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 28px; font-weight: 800; color: #FFFFFF; line-height: 1.1;">Stat<span style="color: #2ECC71;">isfy</span></span>
+    <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; color: #8892B0; letter-spacing: 2px;">DATA-DRIVEN BETTING</span>
+  </div>
 </div>
 """
 st.markdown(logo_html, unsafe_allow_html=True)
@@ -154,7 +154,7 @@ else:
                         # Als teams genoeg data hebben, kunnen we achteraf evalueren of het model gelijk had
                         if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
                             season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
-                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                             h_history = team_match_history.get(home, [])[-5:]
                             a_history = team_match_history.get(away, [])[-5:]
@@ -239,7 +239,7 @@ else:
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
-                        a_history = team_match_history.get(a, [])[-5:]
+                        a_history = team_match_history.get(away, [])[-5:]
                         
                         if len(h_history) > 0 and len(a_history) > 0:
                             h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
@@ -297,32 +297,3 @@ else:
             st.markdown("---")
             st.header(f"⚽ Top Spelers: {selected_league_name}")
             if league_top_players:
-                for comp_name, players in league_top_players.items():
-                    with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
-                        df_p = pd.DataFrame(players)
-                        st.dataframe(df_p, use_container_width=True)
-            else:
-                st.info("Geen topscorersdata beschikbaar.")
-
-        with tab2:
-            st.header(f"📊 Historische Evaluatie: {selected_league_name}")
-            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
-            
-            if evaluation_results:
-                df_eval = pd.DataFrame(evaluation_results)
-                
-                total_preds = len(df_eval)
-                correct_preds = df_eval["Win_Bool"].sum()
-                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
-                
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Totaal Geteste Picks", total_preds)
-                col2.metric("Aantal Goed", int(correct_preds))
-                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
-                
-                st.markdown("---")
-                df_eval_display = df_eval.drop(columns=["Win_Bool"])
-                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
-                st.dataframe(df_eval_display, use_container_width=True)
-            else:
-                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
