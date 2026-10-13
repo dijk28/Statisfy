@@ -297,3 +297,32 @@ else:
             st.markdown("---")
             st.header(f"⚽ Top Spelers: {selected_league_name}")
             if league_top_players:
+                for comp_name, players in league_top_players.items():
+                    with st.expander(f"📊 Bekijk topscorers van {comp_name}"):
+                        df_p = pd.DataFrame(players)
+                        st.dataframe(df_p, use_container_width=True)
+            else:
+                st.info("Geen topscorersdata beschikbaar.")
+
+        with tab2:
+            st.header(f"📊 Historische Evaluatie: {selected_league_name}")
+            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
+            
+            if evaluation_results:
+                df_eval = pd.DataFrame(evaluation_results)
+                
+                total_preds = len(df_eval)
+                correct_preds = df_eval["Win_Bool"].sum()
+                hitrate = (correct_preds / total_preds) * 100 if total_preds > 0 else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Totaal Geteste Picks", total_preds)
+                col2.metric("Aantal Goed", int(correct_preds))
+                col3.metric("Nauwkeurigheid (Hitrate)", f"{round(hitrate, 1)}%")
+                
+                st.markdown("---")
+                df_eval_display = df_eval.drop(columns=["Win_Bool"])
+                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
+                st.dataframe(df_eval_display, use_container_width=True)
+            else:
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
