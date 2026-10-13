@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import poisson
 import time
 
-# Pagina configuratie & mobiele optimalisatie
+# Pagina configuratie
 st.set_page_config(
     page_title="Statisfy - Betting Assistant",
     page_icon="⚽",
@@ -52,16 +52,9 @@ logo_html = """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
 
-# --- ZIJBALK VOOR INSTELLINGEN & BANKROLL ---
-st.sidebar.header("⚙️ Instellingen & Bankroll")
+# --- ZIJBALK VOOR API KEY & COMPETITIE SELECTIE ---
+st.sidebar.header("⚙️ Instellingen")
 api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("💰 Bankroll Management")
-total_bankroll = st.sidebar.number_input("Totale Bankroll (€)", min_value=10.0, value=500.0, step=50.0)
-unit_percentage = st.sidebar.slider("Inzet per Bet (% van Bankroll)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
-unit_size = total_bankroll * (unit_percentage / 100.0)
-st.sidebar.info(f"Standaard unit: **€{round(unit_size, 2)}** ({unit_percentage}%).")
 
 LEAGUES = {
     "Premier League": "PL",
@@ -78,7 +71,7 @@ LEAGUES = {
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎯 Selecteer Competitie")
-selected_league_name = st.sidebar.selectbox("Kies competitie om te analyseren", list(LEAGUES.keys()))
+selected_league_name = st.sidebar.selectbox("Kies competitie", list(LEAGUES.keys()))
 league_code = LEAGUES[selected_league_name]
 
 if not api_key_input:
@@ -86,12 +79,12 @@ if not api_key_input:
 else:
     BASE_URL = "https://api.football-data.org/v4/"
 
-    # Gecachte API-functie met 24-uurs TTL om binnen de gratis limiet te blijven
+    # Gecachte API-functie om binnen de gratis limiet (10 req/min) te blijven
     @st.cache_data(ttl=86400, show_spinner=False)
-    def get_api_data(endpoint, api_key):
-        headers = {"X-Auth-Token": api_key}
+    def get_api_data_cached(endpoint, api_key):
         url = f"{BASE_URL}{endpoint}"
-        response = requests.get(url, headers=headers)
+        resp_headers = {"X-Auth-Token": api_key}
+        response = requests.get(url, headers=resp_headers)
         time.sleep(0.5)
         if response.status_code == 200:
             return response.json()
@@ -100,15 +93,16 @@ else:
         return None
 
     if st.sidebar.button("🚀 Start Analyse"):
-        with st.spinner(f"Bezig met het ophalen en analyseren van {selected_league_name}..."):
+        # Duidelijke laad-indicator met spinner
+        with st.spinner(f"🔄 Bezig met berekenen en ophalen van data voor {selected_league_name}... Even geduld aub."):
             master_shortlist = []
             evaluation_results = []
             league_top_players = {}
 
-            # 1. Spelerstatistieken ophalen
-            scorers_data = get_api_data(f"competitions/{league_code}/scorers?limit=3", api_key_input)
+            # 1. Spelerstatistieken ophalen voor de gekozen competitie
+            scorers_data = get_api_data_cached(f"competitions/{league_code}/scorers?limit=3", api_key_input)
             if scorers_data == "RATE_LIMIT":
-                st.error("⚠️ API-limiet bereikt (max 10 verzoeken per minuut). Wacht even een minuutje en probeer het opnieuw.")
+                st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
                 st.stop()
             
             if scorers_data and isinstance(scorers_data, dict) and "scorers" in scorers_data and scorers_data["scorers"]:
@@ -122,13 +116,15 @@ else:
                     })
                 league_top_players[selected_league_name] = top_p
 
-            # 2. Wedstrijddata ophalen
-            match_data = get_api_data(f"competitions/{league_code}/matches", api_key_input)
+            # 2. Wedstrijddata ophalen voor de gekozen competitie
+            match_data = get_api_data_cached(f"competitions/{league_code}/matches", api_key_input)
             if match_data == "RATE_LIMIT":
-                st.error("⚠️ API-limiet bereikt. Wacht even een minuutje en probeer het opnieuw.")
+                st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
                 st.stop()
-
-            if match_data and isinstance(match_data, dict) and "matches" in match_data:
+            
+            if not match_data or not isinstance(match_data, dict) or "matches" not in match_data:
+                st.error(f"⚠️ Kon geen wedstrijddata ophalen voor {selected_league_name}.")
+            else:
                 matches = match_data["matches"]
                 finished_matches = [m for m in matches if m["status"] == "FINISHED"]
                 scheduled = [m for m in matches if m["status"] in ["SCHEDULED", "TIMED"]]
@@ -138,6 +134,121 @@ else:
 
                     season_stats = {}
                     team_match_history = {}
-                    min_games = 1  # Versoepeld naar 1 wedstrijd
 
-                    # Gespeelde wedstrijden verwerken voor statistieken & evaluatie (Drempel
+                    # Eerst alle gespeelde wedstrijden verwerken voor statistieken & evaluatie
+                    for idx, m in enumerate(finished_sorted):
+                        home = m["homeTeam"]["name"]
+                        away = m["awayTeam"]["name"]
+                        date = m["utcDate"][:10]
+                        ft = m["score"]["fullTime"]
+                        hg, ag = ft["home"], ft["away"]
+                        if hg is None or ag is None: continue
+
+                        h_stat = season_stats.get(home)
+                        a_stat = season_stats.get(away)
+                        min_games = 1 if league_code in ["CL", "EL"] else 3
+
+                        # Als teams genoeg data hebben, kunnen we achteraf evalueren of het model gelijk had
+                        if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
+                            season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+
+                            h_history = team_match_history.get(home, [])[-5:]
+                            a_history = team_match_history.get(away, [])[-5:]
+                            
+                            if len(h_history) > 0 and len(a_history) > 0:
+                                h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
+                                h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
+                                a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
+                                a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
+                                
+                                form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
+                                form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
+                            else:
+                                form_lam_h, form_lam_a = season_lam_h, season_lam_h
+
+                            lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
+                            lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
+                            
+                            max_g = 6
+                            matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
+                            
+                            p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                            p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                            p_under_25 = 1 - p_over_25
+                            p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+
+                            actual_total_goals = hg + ag
+                            actual_home_win = 1 if hg > ag else 0
+                            actual_btts = 1 if (hg > 0 and ag > 0) else 0
+
+                            evals_to_check = [
+                                ("⚽ BTTS", p_btts, actual_btts == 1),
+                                ("🔥 Over 2.5", p_over_25, actual_total_goals > 2.5),
+                                ("🏠 Thuiswinst", p_home_win, actual_home_win == 1),
+                                ("🛡️ Under 2.5", p_under_25, actual_total_goals < 2.5)
+                            ]
+
+                            for cat, prob, did_win in evals_to_check:
+                                if prob >= 0.60:
+                                    evaluation_results.append({
+                                        "Competitie": selected_league_name,
+                                        "Datum": date,
+                                        "Wedstrijd": f"{home} vs {away}",
+                                        "Categorie": cat,
+                                        "Model Kans": f"{int(prob*100)}%",
+                                        "Echte Uitslag": f"{hg} - {ag}",
+                                        "Status": "✅ GOED" if did_win else "❌ FOUT",
+                                        "Win_Bool": did_win
+                                    })
+
+                        # Seizoensstats & historie bijwerken voor volgende iteratie
+                        for team, scored, conceded in [(home, hg, ag), (away, ag, hg)]:
+                            if team not in season_stats:
+                                season_stats[team] = {"played": 0, "gf": 0, "ga": 0}
+                            season_stats[team]["played"] += 1
+                            season_stats[team]["gf"] += scored
+                            season_stats[team]["ga"] += conceded
+
+                        if home not in team_match_history: team_match_history[home] = []
+                        if away not in team_match_history: team_match_history[away] = []
+                        team_match_history[home].append({"scored": hg, "conceded": ag})
+                        team_match_history[away].append({"scored": ag, "conceded": hg})
+
+                # 3. Komende wedstrijden analyseren voor de Shortlist (Mainpage)
+                if scheduled:
+                    next_matchday = scheduled[0]["matchday"]
+                    next_round = [m for m in scheduled if m["matchday"] == next_matchday]
+
+                    for m in next_round:
+                        h = m["homeTeam"]["name"]
+                        a = m["awayTeam"]["name"]
+                        date = m["utcDate"][:10]
+                        
+                        h_stat = season_stats.get(h)
+                        a_stat = season_stats.get(a)
+                        min_games = 1 if league_code in ["CL", "EL"] else 3
+                        
+                        if not h_stat or not a_stat or h_stat["played"] < min_games or a_stat["played"] < min_games:
+                            continue
+                            
+                        season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+
+                        h_history = team_match_history.get(h, [])[-5:]
+                        a_history = team_match_history.get(a, [])[-5:]
+                        
+                        if len(h_history) > 0 and len(a_history) > 0:
+                            h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
+                            h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
+                            a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
+                            a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
+                            
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
+                            form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
+                        else:
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
+
+                        lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
+                        lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
+                        total_lam = lam_
