@@ -216,4 +216,152 @@ else:
                             p_away_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
                             p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
                             
-                            p_over_15 = sum(matrix[i, j] for i in range(
+                            p_over_15 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 1.5)
+                            p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                            p_under_25 = 1 - p_over_25
+                            p_under_35 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) < 3.5)
+                            
+                            p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                            p_dc_1x = p_home_win + p_draw
+                            p_dc_x2 = p_away_win + p_draw
+
+                            actual_total_goals = hg + ag
+                            actual_home_win = 1 if hg > ag else 0
+                            actual_away_win = 1 if hg < ag else 0
+                            actual_btts = 1 if (hg > 0 and ag > 0) else 0
+
+                            evals_to_check = [
+                                ("⚽ BTTS", p_btts, actual_btts == 1),
+                                ("🔥 Over 2.5", p_over_25, actual_total_goals > 2.5),
+                                ("⚡ Over 1.5", p_over_15, actual_total_goals > 1.5),
+                                ("🏠 Thuiswinst", p_home_win, actual_home_win == 1),
+                                ("✈️ Uitwinst", p_away_win, actual_away_win == 1),
+                                ("🛡️ Under 2.5", p_under_25, actual_total_goals < 2.5),
+                                ("🛡️ Under 3.5", p_under_35, actual_total_goals < 3.5),
+                                ("🤝 Dubbele Kans (1X)", p_dc_1x, hg >= ag),
+                                ("🤝 Dubbele Kans (X2)", p_dc_x2, hg <= ag)
+                            ]
+
+                            for cat, prob, did_win in evals_to_check:
+                                if prob >= 0.60:
+                                    evaluation_results.append({
+                                        "Competitie": selected_league_name,
+                                        "Datum": date,
+                                        "Wedstrijd": f"{home} vs {away}",
+                                        "Categorie": cat,
+                                        "Model Kans": f"{int(prob*100)}%",
+                                        "Echte Uitslag": f"{hg} - {ag}",
+                                        "Status": "✅ GOED" if did_win else "❌ FOUT",
+                                        "Win_Bool": did_win
+                                    })
+
+                        for team, scored, conceded in [(home, hg, ag), (away, ag, hg)]:
+                            if team not in season_stats:
+                                season_stats[team] = {"played": 0, "gf": 0, "ga": 0}
+                            season_stats[team]["played"] += 1
+                            season_stats[team]["gf"] += scored
+                            season_stats[team]["ga"] += conceded
+
+                        if home not in team_match_history: team_match_history[home] = []
+                        if away not in team_match_history: team_match_history[away] = []
+                        team_match_history[home].append({"scored": hg, "conceded": ag})
+                        team_match_history[away].append({"scored": ag, "conceded": hg})
+
+                # 3. Komende wedstrijden analyseren
+                if scheduled:
+                    next_matchday = scheduled[0]["matchday"]
+                    next_round = [m for m in scheduled if m["matchday"] == next_matchday]
+
+                    for m in next_round:
+                        h = m["homeTeam"]["name"]
+                        a = m["awayTeam"]["name"]
+                        date = m["utcDate"][:10]
+                        
+                        h_stat = season_stats.get(h)
+                        a_stat = season_stats.get(a)
+                        min_games = 1 if league_code in ["CL", "EL"] else 3
+                        
+                        if not h_stat or not a_stat or h_stat["played"] < min_games or a_stat["played"] < min_games:
+                            continue
+                            
+                        raw_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        raw_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+
+                        if league_code in ["CL", "EL"]:
+                            baseline_lambda = 1.35
+                            weight_h = min(1.0, h_stat["played"] / 4.0)
+                            weight_a = min(1.0, a_stat["played"] / 4.0)
+                            season_lam_h = (weight_h * raw_lam_h) + ((1 - weight_h) * baseline_lambda)
+                            season_lam_a = (weight_a * raw_lam_a) + ((1 - weight_a) * baseline_lambda)
+                        else:
+                            season_lam_h = raw_lam_h
+                            season_lam_a = raw_lam_a
+
+                        h_history = team_match_history.get(h, [])[-5:]
+                        a_history = team_match_history.get(a, [])[-5:]
+                        
+                        if len(h_history) > 0 and len(a_history) > 0:
+                            h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
+                            h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
+                            a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
+                            a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
+                            
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
+                            form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
+                        else:
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
+
+                        lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
+                        lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
+                        total_lam = lam_h + lam_a
+                        
+                        max_g = 6
+                        matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
+                        
+                        p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                        p_away_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
+                        p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
+                        
+                        p_over_15 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 1.5)
+                        p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                        p_under_25 = 1 - p_over_25
+                        p_under_35 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) < 3.5)
+                        
+                        p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                        p_dc_1x = p_home_win + p_draw
+                        p_dc_x2 = p_away_win + p_draw
+
+                        form_sample_h = len(h_history)
+                        if league_code in ["CL", "EL"]:
+                            data_label = f"🇪🇺 Europa (Spelers: {h_stat['played']}d)"
+                        else:
+                            data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
+
+                        if p_btts >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "⚽ BTTS (Beide Teams Scoren)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Kans op doelpunten beide kanten: {int(p_btts*100)}%",
+                                "Fair Odd": round(1 / p_btts, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_btts
+                            })
+                        if p_over_25 >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "🔥 Doelpunten (Over 2.5)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)",
+                                "Fair Odd": round(1 / p_over_25, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_over_25
+                            })
+                        if p_over_15 >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "⚡ Doelpunten (Over 1.5)",
+                                "Datum": date,
+                                "Wedstrijd":
