@@ -192,19 +192,33 @@ else:
                             matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
                             
                             p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                            p_away_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
+                            p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
+                            
+                            p_over_15 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 1.5)
                             p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
                             p_under_25 = 1 - p_over_25
+                            p_under_35 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) < 3.5)
+                            
                             p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                            p_dc_1x = p_home_win + p_draw
+                            p_dc_x2 = p_away_win + p_draw
 
                             actual_total_goals = hg + ag
                             actual_home_win = 1 if hg > ag else 0
+                            actual_away_win = 1 if hg < ag else 0
                             actual_btts = 1 if (hg > 0 and ag > 0) else 0
 
                             evals_to_check = [
                                 ("⚽ BTTS", p_btts, actual_btts == 1),
                                 ("🔥 Over 2.5", p_over_25, actual_total_goals > 2.5),
+                                ("⚡ Over 1.5", p_over_15, actual_total_goals > 1.5),
                                 ("🏠 Thuiswinst", p_home_win, actual_home_win == 1),
-                                ("🛡️ Under 2.5", p_under_25, actual_total_goals < 2.5)
+                                ("✈️ Uitwinst", p_away_win, actual_away_win == 1),
+                                ("🛡️ Under 2.5", p_under_25, actual_total_goals < 2.5),
+                                ("🛡️ Under 3.5", p_under_35, actual_total_goals < 3.5),
+                                ("🤝 Dubbele Kans (1X)", p_dc_1x, hg >= ag),
+                                ("🤝 Dubbele Kans (X2)", p_dc_x2, hg <= ag)
                             ]
 
                             for cat, prob, did_win in evals_to_check:
@@ -274,9 +288,17 @@ else:
                         matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
                         
                         p_home_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                        p_away_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
+                        p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
+                        
+                        p_over_15 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 1.5)
                         p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
                         p_under_25 = 1 - p_over_25
+                        p_under_35 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) < 3.5)
+                        
                         p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                        p_dc_1x = p_home_win + p_draw
+                        p_dc_x2 = p_away_win + p_draw
 
                         form_sample_h = len(h_history)
                         if league_code in ["CL", "EL"]:
@@ -306,6 +328,17 @@ else:
                                 "Data Basis": data_label,
                                 "Prob_Val": p_over_25
                             })
+                        if p_over_15 >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "⚡ Doelpunten (Over 1.5)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Over 1.5 kans: {int(p_over_15*100)}%)",
+                                "Fair Odd": round(1 / p_over_15, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_over_15
+                            })
                         if p_home_win >= 0.60:
                             master_shortlist.append({
                                 "Competitie": selected_league_name,
@@ -317,6 +350,17 @@ else:
                                 "Data Basis": data_label,
                                 "Prob_Val": p_home_win
                             })
+                        if p_away_win >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "✈️ Sterke Uitwinst",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Uitwinst kans: {int(p_away_win*100)}%",
+                                "Fair Odd": round(1 / p_away_win, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_away_win
+                            })
                         if p_under_25 >= 0.60:
                             master_shortlist.append({
                                 "Competitie": selected_league_name,
@@ -327,6 +371,39 @@ else:
                                 "Fair Odd": round(1 / p_under_25, 2),
                                 "Data Basis": data_label,
                                 "Prob_Val": p_under_25
+                            })
+                        if p_under_35 >= 0.60:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "🛡️ Veilige Goals (Under 3.5)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under 3.5 kans: {int(p_under_35*100)}%)",
+                                "Fair Odd": round(1 / p_under_35, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_under_35
+                            })
+                        if p_dc_1x >= 0.65:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "🤝 Dubbele Kans (1X)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Thuis of Gelijk kans: {int(p_dc_1x*100)}%",
+                                "Fair Odd": round(1 / p_dc_1x, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_dc_1x
+                            })
+                        if p_dc_x2 >= 0.65:
+                            master_shortlist.append({
+                                "Competitie": selected_league_name,
+                                "Categorie": "🤝 Dubbele Kans (X2)",
+                                "Datum": date,
+                                "Wedstrijd": f"{h} vs {a}",
+                                "Indicatie / Model": f"Uit of Gelijk kans: {int(p_dc_x2*100)}%",
+                                "Fair Odd": round(1 / p_dc_x2, 2),
+                                "Data Basis": data_label,
+                                "Prob_Val": p_dc_x2
                             })
 
         st.success("Analyse succesvol voltooid!")
