@@ -94,12 +94,17 @@ else:
     def get_api_data_cached(endpoint, api_key):
         url = f"{BASE_URL}{endpoint}"
         resp_headers = {"X-Auth-Token": api_key}
-        response = requests.get(url, headers=resp_headers)
-        time.sleep(0.5)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 429:
-            return "RATE_LIMIT"
+        try:
+            response = requests.get(url, headers=resp_headers, timeout=10)
+            time.sleep(0.5)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                return "RATE_LIMIT"
+        except requests.exceptions.Timeout:
+            return "TIMEOUT"
+        except Exception:
+            return None
         return None
 
     if st.sidebar.button("🚀 Start Analyse"):
@@ -112,6 +117,9 @@ else:
             scorers_data = get_api_data_cached(f"competitions/{league_code}/scorers?limit=3", api_key_input)
             if scorers_data == "RATE_LIMIT":
                 st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
+                st.stop()
+            elif scorers_data == "TIMEOUT":
+                st.error("⚠️ De verbinding met de server duurde te lang. Probeer het zo nog eens.")
                 st.stop()
             
             if scorers_data and isinstance(scorers_data, dict) and "scorers" in scorers_data and scorers_data["scorers"]:
@@ -129,6 +137,9 @@ else:
             match_data = get_api_data_cached(f"competitions/{league_code}/matches", api_key_input)
             if match_data == "RATE_LIMIT":
                 st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
+                st.stop()
+            elif match_data == "TIMEOUT":
+                st.error("⚠️ De verbinding met de server duurde te lang. Probeer het zo nog eens.")
                 st.stop()
             
             if not match_data or not isinstance(match_data, dict) or "matches" not in match_data:
@@ -242,7 +253,7 @@ else:
                         season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
                         h_history = team_match_history.get(h, [])[-5:]
-                        a_history = team_match_history.get(a, [])[-5:]
+                        a_history = team_match_history.get(away, [])[-5:]
                         
                         if len(h_history) > 0 and len(a_history) > 0:
                             h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
