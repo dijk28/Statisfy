@@ -61,6 +61,24 @@ logo_html = """
 </svg>
 """
 st.markdown(logo_html, unsafe_allow_html=True)
+
+# --- UITLEG & HANDLEIDING ---
+with st.expander("📖 Hoe werkt Statisfy & Hoe gebruik je dit het slimste?", expanded=False):
+    st.markdown("""
+    Welkom bij **Statisfy**! Deze app berekent objectieve, wiskundige kansen voor voetbalwedstrijden om je te helpen bij het vinden van waarde.
+    
+    ### 🧠 Wat wordt er precies berekend?
+    * **Poisson Verdeling:** Het model berekent op basis van historische data de verwachte doelpunten ($\lambda$) voor zowel de thuis- als uitploeg. Hiermee wordt een complete kansenmatrix (0 t/m 5 goals) en de kans op markten zoals *Over/Under*, *BTTS (Beide Teams Scoren)* en *1X2* bepaald.
+    * **Vorm vs. Seizoen:** De berekening combineert de recente vorm van de laatste 5 wedstrijden (**60% weging**) met de totale seizoensdata (**40% weging**). Voor Europese bekers (CL/EL) wordt een slimme *Bayesian shrinkage* baseline gebruikt.
+    * **Expected Value ($\text{EV}\%$):** Het model vergelijkt de werkelijke modelkans (de *Fair Odd*) met een geschatte bookmaker odd (inclusief jouw ingestelde bookmaker marge). Een positieve $\text{EV}\%$ betekent dat de odd theoretisch gunstiger is dan de statistische kans.
+
+    ### 💡 Hoe gebruik je dit het slimste?
+    1. **Stel je filters scherp:** Gebruik de zijbalk om odds onder de gewenste drempel (bijv. `< 1.2`) automatisch weg te filteren, zodat je geen tijd verliest aan weddenschappen met te weinig rendement.
+    2. **Speel bij voorkeur SINGLES:** Het combineren van meerdere wedstrijden (accumulators/combis) verkleint je winkans exponentieel en laat bookmakers dubbel profiteren via gestapelde marges. Focus op losse weddenschappen met een sterke $\text{EV}\%$.
+    3. **Check de Simulator:** Twijfel je over een specifieke wedstrijd? Gebruik de **Wedstrijd Simulator** in Tab 2 om de exacte kansenmatrix en verwachte doelpunten van twee willekeurige teams tegen elkaar te bekijken.
+    4. **Beheer je risico:** Geen enkele statistiek biedt 100% garantie. Gebruik dit model als hulpmiddel en data-analyse, niet als garantie op winst.
+    """)
+
 st.markdown("---")
 
 # --- ZIJBALK ---
