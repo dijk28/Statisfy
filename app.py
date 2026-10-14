@@ -70,7 +70,7 @@ with st.expander("📖 Hoe werkt Statisfy & Hoe gebruik je dit het slimste?", ex
     ### 🧠 Wat wordt er precies berekend?
     * **Poisson Verdeling:** Het model berekent op basis van historische data de verwachte doelpunten ($\lambda$) voor zowel de thuis- als uitploeg. Hiermee wordt een complete kansenmatrix (0 t/m 5 goals) en de kans op markten zoals *Over/Under*, *BTTS (Beide Teams Scoren)* en *1X2* bepaald.
     * **Vorm vs. Seizoen:** De berekening combineert de recente vorm van de laatste 5 wedstrijden (**60% weging**) met de totale seizoensdata (**40% weging**). Voor Europese bekers (CL/EL) wordt een slimme *Bayesian shrinkage* baseline gebruikt.
-    * **Expected Value ($\text{EV}\%$):** Het model vergelijkt de werkelijke modelkans (de *Fair Odd*) met een geschatte bookmaker odd (inclusief jouw ingestelde bookmaker marge). Een positieve $\text{EV}\%$ betekent dat de odd theoretisch gunstiger is dan de statistische kans.
+    * **Expected Value ($\text{EV}\%$):** Het model vergelijkt de werkelijke modelkans (de *Fair Odd*) met een geschatte bookmaker odd (inclusief jouw ingestelde bookmaker marge). Per wedstrijd wordt automatisch **alleen de scherpste single bet** (met de hoogste EV%) geselecteerd voor de shortlist.
 
     ### 💡 Hoe gebruik je dit het slimste?
     1. **Stel je filters scherp:** Gebruik de zijbalk om odds onder de gewenste drempel (bijv. `< 1.2`) automatisch weg te filteren, zodat je geen tijd verliest aan weddenschappen met te weinig rendement.
@@ -297,7 +297,7 @@ else:
                         team_match_history[home].append({"scored": hg, "conceded": ag})
                         team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden analyseren
+                # 3. Komende wedstrijden analyseren (Alleen de allersterkste/scherpste pick per wedstrijd)
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -379,24 +379,22 @@ else:
                             ("🤝 Dubbele Kans (X2)", p_dc_x2, f"Uit of Gelijk kans: {int(p_dc_x2*100)}%")
                         ]
 
+                        match_candidates = []
                         for cat, prob, indication in predictions_to_evaluate:
                             threshold = 0.65 if "Dubbele Kans" in cat else 0.60
                             if prob >= threshold:
                                 fair_odd = round(1 / prob, 2)
                                 
-                                # Filter odds onder de ingestelde min_odd (standaard 1.2)
                                 if fair_odd < min_odd:
                                     continue
                                 
-                                # Bookmaker odd inclusief marge berekening voor EV
                                 bookie_odd = round(fair_odd * (1 - (bookmaker_margin / 100)), 2)
                                 bookie_odd = max(1.01, bookie_odd)
                                 
-                                # Expected Value (EV) = (Prob * Bookie_Odd) - 1
                                 ev_value = (prob * bookie_odd) - 1
                                 ev_percentage = round(ev_value * 100, 1)
 
-                                master_shortlist.append({
+                                match_candidates.append({
                                     "Competitie": selected_league_name,
                                     "Categorie": cat,
                                     "Datum": date,
@@ -409,6 +407,12 @@ else:
                                     "Prob_Val": prob,
                                     "EV_Val": ev_value
                                 })
+
+                        # Filter: selecteer per wedstrijd uitsluitend de allersterkste pick (hoogste EV_Val)
+                        if match_candidates:
+                            match_candidates.sort(key=lambda x: x["EV_Val"], reverse=True)
+                            best_pick = match_candidates[0]
+                            master_shortlist.append(best_pick)
 
             # Resultaten opslaan in session state
             st.session_state.master_shortlist = master_shortlist
