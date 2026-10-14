@@ -85,6 +85,11 @@ st.sidebar.subheader("🎯 Selecteer Competitie")
 selected_league_name = st.sidebar.selectbox("Kies competitie", list(LEAGUES.keys()))
 league_code = LEAGUES[selected_league_name]
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("💰 Betting Filters & EV")
+min_odd = st.sidebar.slider("Minimale Odd Filter", min_value=1.0, max_value=2.5, value=1.2, step=0.05, help="Filter odds onder deze waarde eruit (standaard 1.2).")
+bookmaker_margin = st.sidebar.slider("Bookmaker Marge (%)", min_value=0.0, max_value=10.0, value=5.0, step=0.5, help="Gebruikt voor Expected Value (EV) berekening ten opzichte van fair odds.")
+
 # --- SESSION STATE INITIALISATIE ---
 if "master_shortlist" not in st.session_state:
     st.session_state.master_shortlist = []
@@ -92,6 +97,10 @@ if "evaluation_results" not in st.session_state:
     st.session_state.evaluation_results = []
 if "league_top_players" not in st.session_state:
     st.session_state.league_top_players = {}
+if "season_stats" not in st.session_state:
+    st.session_state.season_stats = {}
+if "team_match_history" not in st.session_state:
+    st.session_state.team_match_history = {}
 if "analyzed_league" not in st.session_state:
     st.session_state.analyzed_league = None
 
@@ -122,6 +131,8 @@ else:
             master_shortlist = []
             evaluation_results = []
             league_top_players = {}
+            season_stats = {}
+            team_match_history = {}
 
             # 1. Spelerstatistieken ophalen
             scorers_data = get_api_data_cached(f"competitions/{league_code}/scorers?limit=3", api_key_input)
@@ -161,9 +172,6 @@ else:
                 
                 if finished_matches:
                     finished_sorted = sorted(finished_matches, key=lambda x: x["utcDate"])
-
-                    season_stats = {}
-                    team_match_history = {}
 
                     for idx, m in enumerate(finished_sorted):
                         home = m["homeTeam"]["name"]
@@ -244,7 +252,8 @@ else:
                             ]
 
                             for cat, prob, did_win in evals_to_check:
-                                if prob >= 0.60:
+                                fair_odd = round(1 / prob, 2) if prob > 0 else 99.0
+                                if prob >= 0.60 and fair_odd >= min_odd:
                                     evaluation_results.append({
                                         "Competitie": selected_league_name,
                                         "Datum": date,
@@ -340,126 +349,75 @@ else:
                         else:
                             data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
 
-                        if p_btts >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "⚽ BTTS (Beide Teams Scoren)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Kans op doelpunten beide kanten: {int(p_btts*100)}%",
-                                "Fair Odd": round(1 / p_btts, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_btts
-                            })
-                        if p_over_25 >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🔥 Doelpunten (Over 2.5)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)",
-                                "Fair Odd": round(1 / p_over_25, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_over_25
-                            })
-                        if p_over_15 >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "⚡ Doelpunten (Over 1.5)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Over 1.5 kans: {int(p_over_15*100)}%)",
-                                "Fair Odd": round(1 / p_over_15, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_over_15
-                            })
-                        if p_home_win >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🏠 Sterke Thuiswinst",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Thuiswinst kans: {int(p_home_win*100)}%",
-                                "Fair Odd": round(1 / p_home_win, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_home_win
-                            })
-                        if p_away_win >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "✈️ Sterke Uitwinst",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Uitwinst kans: {int(p_away_win*100)}%",
-                                "Fair Odd": round(1 / p_away_win, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_away_win
-                            })
-                        if p_under_25 >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🛡️ Weinig Goals (Under 2.5)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)",
-                                "Fair Odd": round(1 / p_under_25, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_under_25
-                            })
-                        if p_under_35 >= 0.60:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🛡️ Veilige Goals (Under 3.5)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Verwacht: {round(total_lam, 2)} goals (Under 3.5 kans: {int(p_under_35*100)}%)",
-                                "Fair Odd": round(1 / p_under_35, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_under_35
-                            })
-                        if p_dc_1x >= 0.65:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🤝 Dubbele Kans (1X)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Thuis of Gelijk kans: {int(p_dc_1x*100)}%",
-                                "Fair Odd": round(1 / p_dc_1x, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_dc_1x
-                            })
-                        if p_dc_x2 >= 0.65:
-                            master_shortlist.append({
-                                "Competitie": selected_league_name,
-                                "Categorie": "🤝 Dubbele Kans (X2)",
-                                "Datum": date,
-                                "Wedstrijd": f"{h} vs {a}",
-                                "Indicatie / Model": f"Uit of Gelijk kans: {int(p_dc_x2*100)}%",
-                                "Fair Odd": round(1 / p_dc_x2, 2),
-                                "Data Basis": data_label,
-                                "Prob_Val": p_dc_x2
-                            })
+                        predictions_to_evaluate = [
+                            ("⚽ BTTS (Beide Teams Scoren)", p_btts, f"Kans op doelpunten beide kanten: {int(p_btts*100)}%"),
+                            ("🔥 Doelpunten (Over 2.5)", p_over_25, f"Verwacht: {round(total_lam, 2)} goals (Kans: {int(p_over_25*100)}%)"),
+                            ("⚡ Doelpunten (Over 1.5)", p_over_15, f"Verwacht: {round(total_lam, 2)} goals (Over 1.5 kans: {int(p_over_15*100)}%)"),
+                            ("🏠 Sterke Thuiswinst", p_home_win, f"Thuiswinst kans: {int(p_home_win*100)}%"),
+                            ("✈️ Sterke Uitwinst", p_away_win, f"Uitwinst kans: {int(p_away_win*100)}%"),
+                            ("🛡️ Weinig Goals (Under 2.5)", p_under_25, f"Verwacht: {round(total_lam, 2)} goals (Under kans: {int(p_under_25*100)}%)"),
+                            ("🛡️ Veilige Goals (Under 3.5)", p_under_35, f"Verwacht: {round(total_lam, 2)} goals (Under 3.5 kans: {int(p_under_35*100)}%)"),
+                            ("🤝 Dubbele Kans (1X)", p_dc_1x, f"Thuis of Gelijk kans: {int(p_dc_1x*100)}%"),
+                            ("🤝 Dubbele Kans (X2)", p_dc_x2, f"Uit of Gelijk kans: {int(p_dc_x2*100)}%")
+                        ]
+
+                        for cat, prob, indication in predictions_to_evaluate:
+                            threshold = 0.65 if "Dubbele Kans" in cat else 0.60
+                            if prob >= threshold:
+                                fair_odd = round(1 / prob, 2)
+                                
+                                # Filter odds onder de ingestelde min_odd (standaard 1.2)
+                                if fair_odd < min_odd:
+                                    continue
+                                
+                                # Bookmaker odd inclusief marge berekening voor EV
+                                bookie_odd = round(fair_odd * (1 - (bookmaker_margin / 100)), 2)
+                                bookie_odd = max(1.01, bookie_odd)
+                                
+                                # Expected Value (EV) = (Prob * Bookie_Odd) - 1
+                                ev_value = (prob * bookie_odd) - 1
+                                ev_percentage = round(ev_value * 100, 1)
+
+                                master_shortlist.append({
+                                    "Competitie": selected_league_name,
+                                    "Categorie": cat,
+                                    "Datum": date,
+                                    "Wedstrijd": f"{h} vs {a}",
+                                    "Indicatie / Model": indication,
+                                    "Fair Odd": fair_odd,
+                                    "Bookie Odd (est.)": bookie_odd,
+                                    "EV (%)": f"{ev_percentage}%",
+                                    "Data Basis": data_label,
+                                    "Prob_Val": prob,
+                                    "EV_Val": ev_value
+                                })
 
             # Resultaten opslaan in session state
             st.session_state.master_shortlist = master_shortlist
             st.session_state.evaluation_results = evaluation_results
             st.session_state.league_top_players = league_top_players
+            st.session_state.season_stats = season_stats
+            st.session_state.team_match_history = team_match_history
             st.session_state.analyzed_league = selected_league_name
             st.success("Analyse succesvol voltooid!")
 
     # --- RENDER TABS VANUIT SESSION STATE ---
     if st.session_state.analyzed_league == selected_league_name and (st.session_state.master_shortlist or st.session_state.evaluation_results or st.session_state.league_top_players):
-        tab1, tab2 = st.tabs(["🎯 Shortlist (Komende Speelronde)", "📈 Track Record & Evaluatie (Goed/Fout)"])
+        tab1, tab2, tab3 = st.tabs([
+            "🎯 Shortlist (Komende Speelronde)", 
+            "🔬 Wedstrijd Simulator & Matrix", 
+            "📈 Track Record & Evaluatie"
+        ])
         
         with tab1:
-            st.header(f"🏆 Shortlist: {selected_league_name} (>= 60% Kans)")
+            st.header(f"🏆 Shortlist: {selected_league_name} (Odds ≥ {min_odd})")
             if st.session_state.master_shortlist:
                 df_shortlist = pd.DataFrame(st.session_state.master_shortlist)
-                df_shortlist = df_shortlist.sort_values(by="Prob_Val", ascending=False)
-                df_display = df_shortlist.drop(columns=["Prob_Val"])
+                df_shortlist = df_shortlist.sort_values(by="EV_Val", ascending=False)
+                df_display = df_shortlist.drop(columns=["Prob_Val", "EV_Val"])
                 st.dataframe(df_display, use_container_width=True)
             else:
-                st.info(f"Geen wedstrijden gevonden voor {selected_league_name} die aan de strenge criteria van >= 60% kans voldoen.")
+                st.info(f"Geen wedstrijden gevonden voor {selected_league_name} die voldoen aan de criteria (Kans ≥ 60%, Odd ≥ {min_odd}).")
 
             st.markdown("---")
             st.header(f"⚽ Top Spelers: {selected_league_name}")
@@ -472,6 +430,89 @@ else:
                 st.info("Geen topscorersdata beschikbaar.")
 
         with tab2:
+            st.header("🔬 Diepgaande Wedstrijd Simulator & Poisson Matrix")
+            st.markdown("Selecteer twee teams uit deze competitie om de verwachte doelpunten, de kansenmatrix (0 t/m 5 goals) en alle marktkansen te berekenen.")
+            
+            teams_list = sorted(list(st.session_state.season_stats.keys()))
+            if len(teams_list) >= 2:
+                col_t1, col_t2 = st.columns(2)
+                with col_t1:
+                    sim_home = st.selectbox("Thuisploeg", teams_list, index=0)
+                with col_t2:
+                    sim_away = st.selectbox("Uitploeg", teams_list, index=1 if len(teams_list) > 1 else 0)
+                
+                if sim_home == sim_away:
+                    st.warning("⚠️ Kies twee verschillende teams om een simulatie uit te voeren.")
+                else:
+                    h_stat = st.session_state.season_stats.get(sim_home)
+                    a_stat = st.session_state.season_stats.get(sim_away)
+                    
+                    if h_stat and a_stat:
+                        h_history = st.session_state.team_match_history.get(sim_home, [])[-5:]
+                        a_history = st.session_state.team_match_history.get(sim_away, [])[-5:]
+                        
+                        raw_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        raw_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+                        
+                        if league_code in ["CL", "EL"]:
+                            baseline_lambda = 1.35
+                            w_h = min(1.0, h_stat["played"] / 4.0)
+                            w_a = min(1.0, a_stat["played"] / 4.0)
+                            season_lam_h = (w_h * raw_lam_h) + ((1 - w_h) * baseline_lambda)
+                            season_lam_a = (w_a * raw_lam_a) + ((1 - w_a) * baseline_lambda)
+                        else:
+                            season_lam_h = raw_lam_h
+                            season_lam_a = raw_lam_a
+
+                        if len(h_history) > 0 and len(a_history) > 0:
+                            h_form_gf = sum([x["scored"] for x in h_history]) / len(h_history)
+                            h_form_ga = sum([x["conceded"] for x in h_history]) / len(h_history)
+                            a_form_gf = sum([x["scored"] for x in a_history]) / len(a_history)
+                            a_form_ga = sum([x["conceded"] for x in a_history]) / len(a_history)
+                            form_lam_h = max(0.5, (h_form_gf + a_form_ga) / 2)
+                            form_lam_a = max(0.5, (a_form_gf + h_form_ga) / 2)
+                        else:
+                            form_lam_h, form_lam_a = season_lam_h, season_lam_h
+
+                        lam_h = (0.6 * form_lam_h) + (0.4 * season_lam_h)
+                        lam_a = (0.6 * form_lam_a) + (0.4 * season_lam_a)
+                        
+                        st.markdown("### 📈 Verwachte Doelpunten ($\lambda$)")
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        col_m1.metric(f"Verwacht {sim_home} (Thuis)", round(lam_h, 2))
+                        col_m2.metric(f"Verwacht {sim_away} (Uit)", round(lam_a, 2))
+                        col_m3.metric("Totaal Verwacht", round(lam_h + lam_a, 2))
+                        
+                        max_g = 6
+                        matrix = np.outer([poisson.pmf(i, lam_h) for i in range(max_g)], [poisson.pmf(j, lam_a) for j in range(max_g)])
+                        
+                        score_matrix_df = pd.DataFrame(
+                            matrix * 100, 
+                            index=[f"{sim_home} {i}" for i in range(max_g)], 
+                            columns=[f"{sim_away} {j}" for j in range(max_g)]
+                        ).round(1)
+                        
+                        st.markdown("### 🧮 Poisson Kansmatrix (%)")
+                        st.markdown("Kans op elke mogelijke eindstand (in %):")
+                        st.dataframe(score_matrix_df.style.background_gradient(cmap="Greens", axis=None), use_container_width=True)
+                        
+                        p_hw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
+                        p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
+                        p_aw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
+                        p_o25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
+                        p_u25 = 1 - p_o25
+                        p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
+                        
+                        st.markdown("### 📊 Model Kansen & Fair Odds")
+                        col_o1, col_o2, col_o3, col_o4 = st.columns(4)
+                        col_o1.metric("Thuiswinst", f"{int(p_hw*100)}%", f"Odd: {round(1/p_hw, 2)}")
+                        col_o2.metric("Gelijkspel", f"{int(p_draw*100)}%", f"Odd: {round(1/p_draw, 2)}")
+                        col_o3.metric("Uitwinst", f"{int(p_aw*100)}%", f"Odd: {round(1/p_aw, 2)}")
+                        col_o4.metric("BTTS (Ja)", f"{int(p_btts*100)}%", f"Odd: {round(1/p_btts, 2)}")
+            else:
+                st.info("Start eerst de analyse via de zijbalk zodat er teamdata beschikbaar is voor de simulator.")
+
+        with tab3:
             st.header(f"📊 Historische Evaluatie: {selected_league_name}")
             st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model daadwerkelijk uitkwam.")
             
