@@ -494,7 +494,7 @@ else:
                         
                         st.markdown("### 🧮 Poisson Kansmatrix (%)")
                         st.markdown("Kans op elke mogelijke eindstand (in %):")
-                        st.dataframe(score_matrix_df.style.background_gradient(cmap="Greens", axis=None), use_container_width=True)
+                        st.dataframe(score_matrix_df, use_container_width=True)
                         
                         p_hw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i > j)
                         p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
