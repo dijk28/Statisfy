@@ -12,22 +12,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS voor native app look & mobiele optimalisatie (inclusief zichtbare header voor mobiel menu)
+# Custom CSS voor mobiel en zichtbare header
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: visible !important;}
-        [data-testid="stHeader"] {
-            background-color: transparent;
-        }
+        [data-testid="stHeader"] { background-color: transparent; }
         .block-container {
             padding-top: 1rem;
             padding-bottom: 2rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
-        /* Extra mobiele optimalisaties */
         @media (max-width: 768px) {
             .block-container {
                 padding-top: 0.5rem;
@@ -66,7 +63,7 @@ logo_html = """
 st.markdown(logo_html, unsafe_allow_html=True)
 st.markdown("---")
 
-# --- ZIJBALK VOOR API KEY & COMPETITIE SELECTIE ---
+# --- ZIJBALK ---
 st.sidebar.header("⚙️ Instellingen")
 api_key_input = st.sidebar.text_input("Football-Data.org API Key", type="password", value="ccd41811b56d4cf6bb944d2a5d5286f7")
 
@@ -88,18 +85,28 @@ st.sidebar.subheader("🎯 Selecteer Competitie")
 selected_league_name = st.sidebar.selectbox("Kies competitie", list(LEAGUES.keys()))
 league_code = LEAGUES[selected_league_name]
 
+# --- SESSION STATE INITIALISATIE ---
+if "master_shortlist" not in st.session_state:
+    st.session_state.master_shortlist = []
+if "evaluation_results" not in st.session_state:
+    st.session_state.evaluation_results = []
+if "league_top_players" not in st.session_state:
+    st.session_state.league_top_players = {}
+if "analyzed_league" not in st.session_state:
+    st.session_state.analyzed_league = None
+
 if not api_key_input:
     st.warning("⚠️ Voer je API-key in via de zijbalk aan de linkerkant om de analyse te starten.")
 else:
     BASE_URL = "https://api.football-data.org/v4/"
 
-    @st.cache_data(ttl=86400, show_spinner=False)
+    @st.cache_data(ttl=3600, show_spinner=False)
     def get_api_data_cached(endpoint, api_key):
         url = f"{BASE_URL}{endpoint}"
         resp_headers = {"X-Auth-Token": api_key}
         try:
             response = requests.get(url, headers=resp_headers, timeout=10)
-            time.sleep(0.5)
+            time.sleep(0.3)
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 429:
@@ -171,7 +178,6 @@ else:
                         min_games = 1 if league_code in ["CL", "EL"] else 3
 
                         if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
-                            # Basis berekening lambda
                             raw_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
                             raw_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
 
@@ -180,7 +186,6 @@ else:
                                 baseline_lambda = 1.35
                                 weight_h = min(1.0, h_stat["played"] / 4.0)
                                 weight_a = min(1.0, a_stat["played"] / 4.0)
-                                
                                 season_lam_h = (weight_h * raw_lam_h) + ((1 - weight_h) * baseline_lambda)
                                 season_lam_a = (weight_a * raw_lam_a) + ((1 - weight_a) * baseline_lambda)
                             else:
@@ -211,11 +216,4 @@ else:
                             p_away_win = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i < j)
                             p_draw = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if i == j)
                             
-                            p_over_15 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 1.5)
-                            p_over_25 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) > 2.5)
-                            p_under_25 = 1 - p_over_25
-                            p_under_35 = sum(matrix[i, j] for i in range(max_g) for j in range(max_g) if (i + j) < 3.5)
-                            
-                            p_btts = sum(matrix[i, j] for i in range(1, max_g) for j in range(1, max_g))
-                            p_dc_1x = p_home_win + p_draw
-                            p_dc_x2 = p_away_win + p
+                            p_over_15 = sum(matrix[i, j] for i in range(
