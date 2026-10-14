@@ -345,7 +345,7 @@ else:
 
         with tab2:
             st.header(f"📊 Historische Evaluatie: {selected_league_name}")
-            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model ($\ge 60\%$) daadwerkelijk uitkwam.")
+            st.markdown(f"Hier zie je per reeds gespeelde wedstrijd in {selected_league_name} of de voorspelling van het model daadwerkelijk uitkwam.")
             
             if evaluation_results:
                 df_eval = pd.DataFrame(evaluation_results)
@@ -361,4 +361,7 @@ else:
                 
                 st.markdown("---")
                 df_eval_display = df_eval.drop(columns=["Win_Bool"])
-                df_eval_display = df_eval_display.sort_values(by="Datum
+                df_eval_display = df_eval_display.sort_values(by="Datum", ascending=False)
+                st.dataframe(df_eval_display, use_container_width=True)
+            else:
+                st.info("Nog niet genoeg historische data beschikbaar om te evalueren.")
