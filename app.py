@@ -5,10 +5,10 @@ import numpy as np
 from scipy.stats import poisson
 import time
 
-# Pagina configuratie
+# Pagina configuratie (hier verwijs je naar je favicon bestand)
 st.set_page_config(
     page_title="Statisfy - Betting Assistant",
-    page_icon="⚽",
+    page_icon="favicon.png",  # <--- Hier zet je de naam van je logo-bestandje
     layout="wide"
 )
 
@@ -305,7 +305,7 @@ else:
                         team_match_history[home].append({"scored": hg, "conceded": ag})
                         team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden analyseren (Afhankelijk van de toggle: 1 beste pick of alle geldige picks)
+                # 3. Komende wedstrijden analyseren
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -416,7 +416,6 @@ else:
                                     "EV_Val": ev_value
                                 })
 
-                        # Toepassen van de selectie op basis van de toggle in de zijbalk
                         if match_candidates:
                             if only_best_pick:
                                 match_candidates.sort(key=lambda x: x["EV_Val"], reverse=True)
