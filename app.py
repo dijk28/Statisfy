@@ -70,7 +70,7 @@ with st.expander("📖 Hoe werkt Statisfy & Hoe gebruik je dit het slimste?", ex
     ### 🧠 Wat wordt er precies berekend?
     * **Poisson Verdeling:** Het model berekent op basis van historische data de verwachte doelpunten ($\lambda$) voor zowel de thuis- als uitploeg. Hiermee wordt een complete kansenmatrix (0 t/m 5 goals) en de kans op markten zoals *Over/Under*, *BTTS (Beide Teams Scoren)* en *1X2* bepaald.
     * **Vorm vs. Seizoen:** De berekening combineert de recente vorm van de laatste 5 wedstrijden (**60% weging**) met de totale seizoensdata (**40% weging**). Voor Europese bekers (CL/EL) wordt een slimme *Bayesian shrinkage* baseline gebruikt.
-    * **Expected Value ($\text{EV}\%$):** Het model vergelijkt de werkelijke modelkans (de *Fair Odd*) met een geschatte bookmaker odd (inclusief jouw ingestelde bookmaker marge). Per wedstrijd wordt automatisch **alleen de scherpste single bet** (met de hoogste EV%) geselecteerd voor de shortlist.
+    * **Expected Value ($\text{EV}\%$):** Het model vergelijkt de werkelijke modelkans (de *Fair Odd*) met een geschatte bookmaker odd (inclusief jouw ingestelde bookmaker marge). Via de zijbalk kun je instellen of je alleen de allersterkste pick per wedstrijd wilt zien of alle geldige markten.
 
     ### 💡 Hoe gebruik je dit het slimste?
     1. **Stel je filters scherp:** Gebruik de zijbalk om odds onder de gewenste drempel (bijv. `< 1.2`) automatisch weg te filteren, zodat je geen tijd verliest aan weddenschappen met te weinig rendement.
@@ -107,6 +107,14 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Betting Filters & EV")
 min_odd = st.sidebar.slider("Minimale Odd Filter", min_value=1.0, max_value=2.5, value=1.2, step=0.05, help="Filter odds onder deze waarde eruit (standaard 1.2).")
 bookmaker_margin = st.sidebar.slider("Bookmaker Marge (%)", min_value=0.0, max_value=10.0, value=5.0, step=0.5, help="Gebruikt voor Expected Value (EV) berekening ten opzichte van fair odds.")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📌 Shortlist Weergave")
+only_best_pick = st.sidebar.toggle(
+    "Beperk tot 1 beste pick per wedstrijd", 
+    value=True, 
+    help="Aan: Toont per wedstrijd alleen de allersterkste/scherpste weddenschap. Uit: Toont alle geldige markten die aan de criteria voldoen."
+)
 
 # --- SESSION STATE INITIALISATIE ---
 if "master_shortlist" not in st.session_state:
@@ -297,7 +305,7 @@ else:
                         team_match_history[home].append({"scored": hg, "conceded": ag})
                         team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden analyseren (Alleen de allersterkste/scherpste pick per wedstrijd)
+                # 3. Komende wedstrijden analyseren (Afhankelijk van de toggle: 1 beste pick of alle geldige picks)
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -408,11 +416,14 @@ else:
                                     "EV_Val": ev_value
                                 })
 
-                        # Filter: selecteer per wedstrijd uitsluitend de allersterkste pick (hoogste EV_Val)
+                        # Toepassen van de selectie op basis van de toggle in de zijbalk
                         if match_candidates:
-                            match_candidates.sort(key=lambda x: x["EV_Val"], reverse=True)
-                            best_pick = match_candidates[0]
-                            master_shortlist.append(best_pick)
+                            if only_best_pick:
+                                match_candidates.sort(key=lambda x: x["EV_Val"], reverse=True)
+                                master_shortlist.append(match_candidates[0])
+                            else:
+                                for cand in match_candidates:
+                                    master_shortlist.append(cand)
 
             # Resultaten opslaan in session state
             st.session_state.master_shortlist = master_shortlist
