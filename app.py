@@ -24,7 +24,6 @@ st.markdown("""
             padding-left: 1rem;
             padding-right: 1rem;
         }
-        /* Extra mobiele optimalisaties */
         @media (max-width: 768px) {
             .block-container {
                 padding-top: 0.5rem;
@@ -113,7 +112,7 @@ else:
             evaluation_results = []
             league_top_players = {}
 
-            # 1. Spelerstatistieken ophalen voor de gekozen competitie
+            # 1. Spelerstatistieken ophalen
             scorers_data = get_api_data_cached(f"competitions/{league_code}/scorers?limit=3", api_key_input)
             if scorers_data == "RATE_LIMIT":
                 st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
@@ -133,7 +132,7 @@ else:
                     })
                 league_top_players[selected_league_name] = top_p
 
-            # 2. Wedstrijddata ophalen voor de gekozen competitie
+            # 2. Wedstrijddata ophalen
             match_data = get_api_data_cached(f"competitions/{league_code}/matches", api_key_input)
             if match_data == "RATE_LIMIT":
                 st.error("⚠️ Te veel verzoeken naar de API tegelijk. Wacht even een minuutje en probeer opnieuw.")
@@ -168,8 +167,22 @@ else:
                         min_games = 1 if league_code in ["CL", "EL"] else 3
 
                         if h_stat and a_stat and h_stat["played"] >= min_games and a_stat["played"] >= min_games:
-                            season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
-                            season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+                            # Basis berekening lambda
+                            raw_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                            raw_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+
+                            # --- BAYESIAN SHRINKAGE VOOR CL & EL (Kleine sample size correctie) ---
+                            if league_code in ["CL", "EL"]:
+                                baseline_lambda = 1.35  # Standaard Europese verwachting
+                                # Hoe minder wedstrijden gespeeld (< 4), hoe zwaarder de baseline meetelt
+                                weight_h = min(1.0, h_stat["played"] / 4.0)
+                                weight_a = min(1.0, a_stat["played"] / 4.0)
+                                
+                                season_lam_h = (weight_h * raw_lam_h) + ((1 - weight_h) * baseline_lambda)
+                                season_lam_a = (weight_a * raw_lam_a) + ((1 - weight_a) * baseline_lambda)
+                            else:
+                                season_lam_h = raw_lam_h
+                                season_lam_a = raw_lam_a
 
                             h_history = team_match_history.get(home, [])[-5:]
                             a_history = team_match_history.get(away, [])[-5:]
@@ -246,7 +259,7 @@ else:
                         team_match_history[home].append({"scored": hg, "conceded": ag})
                         team_match_history[away].append({"scored": ag, "conceded": hg})
 
-                # 3. Komende wedstrijden analyseren voor de Shortlist (Mainpage)
+                # 3. Komende wedstrijden analyseren voor de Shortlist
                 if scheduled:
                     next_matchday = scheduled[0]["matchday"]
                     next_round = [m for m in scheduled if m["matchday"] == next_matchday]
@@ -263,8 +276,20 @@ else:
                         if not h_stat or not a_stat or h_stat["played"] < min_games or a_stat["played"] < min_games:
                             continue
                             
-                        season_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
-                        season_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+                        raw_lam_h = max(0.5, ((h_stat["gf"] / h_stat["played"]) + (h_stat["ga"] / h_stat["played"])) / 2)
+                        raw_lam_a = max(0.5, ((a_stat["gf"] / a_stat["played"]) + (a_stat["ga"] / a_stat["played"])) / 2)
+
+                        # --- BAYESIAN SHRINKAGE VOOR CL & EL ---
+                        if league_code in ["CL", "EL"]:
+                            baseline_lambda = 1.35
+                            weight_h = min(1.0, h_stat["played"] / 4.0)
+                            weight_a = min(1.0, a_stat["played"] / 4.0)
+                            
+                            season_lam_h = (weight_h * raw_lam_h) + ((1 - weight_h) * baseline_lambda)
+                            season_lam_a = (weight_a * raw_lam_a) + ((1 - weight_a) * baseline_lambda)
+                        else:
+                            season_lam_h = raw_lam_h
+                            season_lam_a = raw_lam_a
 
                         h_history = team_match_history.get(h, [])[-5:]
                         a_history = team_match_history.get(away, [])[-5:]
@@ -302,7 +327,7 @@ else:
 
                         form_sample_h = len(h_history)
                         if league_code in ["CL", "EL"]:
-                            data_label = f"⚠️ Beperkt (Europa: {form_sample_h}d)"
+                            data_label = f"🇪🇺 Europa (Spelers: {h_stat['played']}d)"
                         else:
                             data_label = f"Vorm ({form_sample_h}v/{h_stat['played']}s duels)"
 
